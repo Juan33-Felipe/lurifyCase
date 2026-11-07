@@ -1,6 +1,16 @@
 import React, { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AmbientBackground,
@@ -48,6 +58,22 @@ export default function LoginScreen() {
 
   const isLogin = activeTab === 'login';
 
+  // Sacudida horizontal de iOS cuando algo falla.
+  const shakeX = useSharedValue(0);
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.get() }] }));
+  const fail = (message: string) => {
+    setError(message);
+    shakeX.set(
+      withSequence(
+        withTiming(-10, { duration: 50 }),
+        withTiming(9, { duration: 70 }),
+        withTiming(-6, { duration: 70 }),
+        withTiming(4, { duration: 60 }),
+        withSpring(0, { damping: 12, stiffness: 300 })
+      )
+    );
+  };
+
   const changeTab = (tab: AuthTab) => {
     setActiveTab(tab);
     setError(null);
@@ -56,8 +82,8 @@ export default function LoginScreen() {
   /** POST /api/v1/auth/login */
   const submitLogin = async () => {
     const trimmedEmail = email.trim();
-    if (!trimmedEmail || !password) return setError(t('login.missingFields'));
-    if (!EMAIL_REGEX.test(trimmedEmail)) return setError(t('login.invalidEmail'));
+    if (!trimmedEmail || !password) return fail(t('login.missingFields'));
+    if (!EMAIL_REGEX.test(trimmedEmail)) return fail(t('login.invalidEmail'));
 
     setError(null);
     setSubmitting(true);
@@ -67,11 +93,11 @@ export default function LoginScreen() {
       const code = e?.response?.status;
       const serverMsg = e?.response?.data?.message || e?.response?.data?.error;
       if (code === 400 || code === 401 || code === 422) {
-        setError(serverMsg || t('login.invalidCredentials'));
+        fail(serverMsg || t('login.invalidCredentials'));
       } else if (!e?.response) {
-        setError(t('common.networkError'));
+        fail(t('common.networkError'));
       } else {
-        setError(serverMsg || t('common.error'));
+        fail(serverMsg || t('common.error'));
       }
     } finally {
       setSubmitting(false);
@@ -83,11 +109,11 @@ export default function LoginScreen() {
     const trimmedName = fullName.trim();
     const trimmedEmail = email.trim();
     if (!trimmedName || !trimmedEmail || !password || !confirmPassword) {
-      return setError(t('login.missingRegisterFields'));
+      return fail(t('login.missingRegisterFields'));
     }
-    if (!EMAIL_REGEX.test(trimmedEmail)) return setError(t('login.invalidEmail'));
-    if (password.length < 6) return setError(t('login.passwordLength'));
-    if (password !== confirmPassword) return setError(t('login.passwordsMismatch'));
+    if (!EMAIL_REGEX.test(trimmedEmail)) return fail(t('login.invalidEmail'));
+    if (password.length < 6) return fail(t('login.passwordLength'));
+    if (password !== confirmPassword) return fail(t('login.passwordsMismatch'));
 
     setError(null);
     setSubmitting(true);
@@ -97,13 +123,13 @@ export default function LoginScreen() {
       const code = e?.response?.status;
       const serverMsg = e?.response?.data?.message || e?.response?.data?.error;
       if (code === 409) {
-        setError(t('login.emailConflict'));
+        fail(t('login.emailConflict'));
       } else if (code === 400 || code === 422) {
-        setError(serverMsg || t('login.registrationFailed'));
+        fail(serverMsg || t('login.registrationFailed'));
       } else if (!e?.response) {
-        setError(t('common.networkError'));
+        fail(t('common.networkError'));
       } else {
-        setError(serverMsg || t('common.error'));
+        fail(serverMsg || t('common.error'));
       }
     } finally {
       setSubmitting(false);
@@ -149,107 +175,131 @@ export default function LoginScreen() {
             />
 
             {isLogin ? (
-              <GroupedSection key="login">
-                <TextFieldRow
-                  icon="mail"
-                  placeholder={t('login.email')}
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  textContentType="username"
-                  autoComplete="email"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                />
-                <TextFieldRow
-                  ref={passwordRef}
-                  icon="lock"
-                  placeholder={t('login.password')}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  textContentType="password"
-                  autoComplete="current-password"
-                  returnKeyType="done"
-                  onSubmitEditing={submitLogin}
-                  {...passwordLabels}
-                />
-              </GroupedSection>
+              <Animated.View
+                key="login"
+                entering={FadeInDown.springify().damping(18)}
+                exiting={FadeOut.duration(120)}
+                style={shakeStyle}
+              >
+                <GroupedSection>
+                  <TextFieldRow
+                    icon="mail"
+                    placeholder={t('login.email')}
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    textContentType="username"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                  <TextFieldRow
+                    ref={passwordRef}
+                    icon="lock"
+                    placeholder={t('login.password')}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    textContentType="password"
+                    autoComplete="current-password"
+                    returnKeyType="done"
+                    onSubmitEditing={submitLogin}
+                    {...passwordLabels}
+                  />
+                </GroupedSection>
+              </Animated.View>
             ) : (
-              <GroupedSection key="register">
-                <TextFieldRow
-                  icon="person"
-                  placeholder={t('login.fullName')}
-                  value={fullName}
-                  onChangeText={setFullName}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  textContentType="name"
-                  autoComplete="name"
-                  returnKeyType="next"
-                  onSubmitEditing={() => regEmailRef.current?.focus()}
-                />
-                <TextFieldRow
-                  ref={regEmailRef}
-                  icon="mail"
-                  placeholder={t('login.email')}
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  textContentType="emailAddress"
-                  autoComplete="email"
-                  returnKeyType="next"
-                  onSubmitEditing={() => regPasswordRef.current?.focus()}
-                />
-                <TextFieldRow
-                  ref={regPasswordRef}
-                  icon="lock"
-                  placeholder={t('login.password')}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  textContentType="newPassword"
-                  autoComplete="new-password"
-                  returnKeyType="next"
-                  onSubmitEditing={() => regConfirmRef.current?.focus()}
-                  {...passwordLabels}
-                />
-                <TextFieldRow
-                  ref={regConfirmRef}
-                  icon="lock"
-                  placeholder={t('login.confirmPassword')}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  textContentType="newPassword"
-                  autoComplete="new-password"
-                  returnKeyType="done"
-                  onSubmitEditing={submitRegister}
-                  {...passwordLabels}
-                />
-              </GroupedSection>
+              <Animated.View
+                key="register"
+                entering={FadeInDown.springify().damping(18)}
+                exiting={FadeOut.duration(120)}
+                style={shakeStyle}
+              >
+                <GroupedSection>
+                  <TextFieldRow
+                    icon="person"
+                    placeholder={t('login.fullName')}
+                    value={fullName}
+                    onChangeText={setFullName}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    textContentType="name"
+                    autoComplete="name"
+                    returnKeyType="next"
+                    onSubmitEditing={() => regEmailRef.current?.focus()}
+                  />
+                  <TextFieldRow
+                    ref={regEmailRef}
+                    icon="mail"
+                    placeholder={t('login.email')}
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => regPasswordRef.current?.focus()}
+                  />
+                  <TextFieldRow
+                    ref={regPasswordRef}
+                    icon="lock"
+                    placeholder={t('login.password')}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    textContentType="newPassword"
+                    autoComplete="new-password"
+                    returnKeyType="next"
+                    onSubmitEditing={() => regConfirmRef.current?.focus()}
+                    {...passwordLabels}
+                  />
+                  <TextFieldRow
+                    ref={regConfirmRef}
+                    icon="lock"
+                    placeholder={t('login.confirmPassword')}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    textContentType="newPassword"
+                    autoComplete="new-password"
+                    returnKeyType="done"
+                    onSubmitEditing={submitRegister}
+                    {...passwordLabels}
+                  />
+                </GroupedSection>
+              </Animated.View>
             )}
 
-            {error ? <InlineMessage message={error} /> : null}
+            {error ? (
+              <Animated.View
+                entering={FadeIn.duration(180)}
+                exiting={FadeOut.duration(120)}
+                layout={LinearTransition.springify().damping(18)}
+              >
+                <InlineMessage message={error} />
+              </Animated.View>
+            ) : null}
 
-            <GlassButton
-              label={
-                isLogin
-                  ? submitting ? t('login.signingIn') : t('login.signIn')
-                  : submitting ? t('login.registering') : t('login.tabRegister')
-              }
-              icon={isLogin ? 'arrowRight' : 'plus'}
-              loading={submitting}
-              onPress={isLogin ? submitLogin : submitRegister}
-              style={styles.cta}
-            />
+            <Animated.View layout={LinearTransition.springify().damping(18)}>
+              <GlassButton
+                label={
+                  isLogin
+                    ? submitting ? t('login.signingIn') : t('login.signIn')
+                    : submitting ? t('login.registering') : t('login.tabRegister')
+                }
+                icon={isLogin ? 'arrowRight' : 'plus'}
+                loading={submitting}
+                onPress={isLogin ? submitLogin : submitRegister}
+                style={styles.cta}
+              />
+            </Animated.View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
