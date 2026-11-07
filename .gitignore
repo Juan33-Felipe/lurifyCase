@@ -1,0 +1,8 @@
+# Cada proyecto tiene su propio .gitignore en backend/ y mobile/.
+# Aquí solo lo común a la raíz.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.env
