@@ -8,6 +8,12 @@ public class AuthTokenResponseDto {
 
     public AuthTokenResponseDto() {}
 
+    public AuthTokenResponseDto(String accessToken, String tokenType, long expiresIn) {
+        this.accessToken = accessToken;
+        this.tokenType = tokenType;
+        this.expiresIn = expiresIn;
+    }
+
     public AuthTokenResponseDto(String accessToken, String tokenType, long expiresIn, UserDto user) {
         this.accessToken = accessToken;
         this.tokenType = tokenType;

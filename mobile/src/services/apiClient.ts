@@ -1,9 +1,13 @@
+/* eslint-disable import/no-named-as-default-member */
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-// Fallback: 10.0.2.2 para Android Emulator, localhost para iOS Simulator / Web.
-const isAndroid = Platform.OS === 'android';
-const DEFAULT_BASE_URL = isAndroid ? 'http://10.0.2.2:8080/api/v1' : 'http://localhost:8080/api/v1';
+// Dispositivo físico → IP LAN de la PC. Emulador Android → 10.0.2.2. Web/iOS Sim → localhost.
+const LAN_IP = '192.168.1.4';
+const DEFAULT_BASE_URL =
+  Platform.OS === 'web'
+    ? 'http://localhost:8080/api/v1'
+    : `http://${LAN_IP}:8080/api/v1`;
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_BASE_URL;
 
 let accessToken: string | null = null;
@@ -40,8 +44,8 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const isLogin = typeof error?.config?.url === 'string' && error.config.url.includes('/auth/login');
-    if (error?.response?.status === 401 && !isLogin && unauthorizedHandler) {
+    const isAuth = typeof error?.config?.url === 'string' && error.config.url.includes('/auth/');
+    if (error?.response?.status === 401 && !isAuth && unauthorizedHandler) {
       unauthorizedHandler();
     }
     return Promise.reject(error);

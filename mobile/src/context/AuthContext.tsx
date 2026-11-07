@@ -13,6 +13,7 @@ interface AuthContextValue {
   status: AuthStatus;
   user: UserProfile | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (fullName: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** Prompts biometrics; on success promotes a locked session to signed-in. */
   unlockWithBiometrics: (promptMessage: string) => Promise<boolean>;
@@ -24,12 +25,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { hydrated, biometricEnabled } = useSettings();
-  const [status, setStatus] = useState<AuthStatus>('signedIn');
-  const [user, setUser] = useState<UserProfile | null>({
-    id: 'user-001',
-    email: 'eleanor.vance@iurify.legal',
-    fullName: 'Eleanor Vance, Esq.',
-  });
+  const [status, setStatus] = useState<AuthStatus>('loading');
+  const [user, setUser] = useState<UserProfile | null>(null);
   const pending = useRef<StoredSession | null>(null);
 
   const activate = useCallback((session: StoredSession) => {
@@ -90,6 +87,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [activate]
   );
 
+  const signUp = useCallback(
+    async (fullName: string, email: string, password: string) => {
+      const res = await authService.register({
+        fullName: fullName.trim(),
+        email: email.trim(),
+        password,
+      });
+      const session: StoredSession = {
+        accessToken: res.accessToken,
+        expiresAt: Date.now() + (res.expiresIn || 86400) * 1000,
+        user: res.user,
+      };
+      await sessionStorage.save(session);
+      activate(session);
+    },
+    [activate]
+  );
+
   const biometricsAvailable = useCallback(async () => {
     const [hardware, enrolled] = await Promise.all([
       LocalAuthentication.hasHardwareAsync(),
@@ -117,8 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ status, user, signIn, signOut, unlockWithBiometrics, biometricsAvailable, confirmBiometrics }),
-    [status, user, signIn, signOut, unlockWithBiometrics, biometricsAvailable, confirmBiometrics]
+    () => ({ status, user, signIn, signUp, signOut, unlockWithBiometrics, biometricsAvailable, confirmBiometrics }),
+    [status, user, signIn, signUp, signOut, unlockWithBiometrics, biometricsAvailable, confirmBiometrics]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

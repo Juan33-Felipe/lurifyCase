@@ -14,7 +14,7 @@ import {
 
 import './global.css';
 import { SettingsProvider, useSettings } from './src/context/SettingsContext';
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CasesProvider } from './src/context/CasesContext';
 import { GlassBackground } from './src/components/Glass';
 import { BottomTabBar, Tab } from './src/components/ui';
@@ -23,14 +23,40 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import AuditScreen from './src/screens/AuditScreen';
 import CaseMapScreen from './src/screens/CaseMapScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import LoginScreen from './src/screens/LoginScreen';
 
 function Shell() {
   const { theme } = useSettings();
+  const { status } = useAuth();
   const [tab, setTab] = useState<Tab>('cases');
   const [newCaseOpen, setNewCaseOpen] = useState(false);
 
   // Top of DashboardScreen has a dark charcoal hero header, so status bar icons are light on 'cases'
   const statusBarStyle = tab === 'cases' ? 'light' : theme === 'dark' ? 'light' : 'dark';
+
+  if (status === 'loading') {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: theme === 'dark' ? '#0F1012' : '#F8F9FB',
+        }}
+      >
+        <ActivityIndicator size="large" color="#1E1E20" />
+      </View>
+    );
+  }
+
+  if (status === 'signedOut' || status === 'locked') {
+    return (
+      <GlassBackground>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+        <LoginScreen />
+      </GlassBackground>
+    );
+  }
 
   return (
     <GlassBackground>
