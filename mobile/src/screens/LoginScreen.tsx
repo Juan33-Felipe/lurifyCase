@@ -96,6 +96,9 @@ export default function LoginScreen() {
         fail(serverMsg || t('login.invalidCredentials'));
       } else if (!e?.response) {
         fail(t('common.networkError'));
+      } else if (code >= 500) {
+        // Nunca mostrar el texto de un error del servidor: puede traer detalles internos.
+        fail(t('login.serverError'));
       } else {
         fail(serverMsg || t('common.error'));
       }
@@ -128,6 +131,9 @@ export default function LoginScreen() {
         fail(serverMsg || t('login.registrationFailed'));
       } else if (!e?.response) {
         fail(t('common.networkError'));
+      } else if (code >= 500) {
+        // Nunca mostrar el texto de un error del servidor: puede traer detalles internos.
+        fail(t('login.serverError'));
       } else {
         fail(serverMsg || t('common.error'));
       }
