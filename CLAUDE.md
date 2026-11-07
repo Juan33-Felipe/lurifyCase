@@ -19,21 +19,22 @@ Esta regla no tiene excepciones.
 
 ### Formato del mensaje
 
-Conventional Commits, en inglés, como ya usa el historial:
+Conventional Commits, con el mensaje **en español**. El historial importado de backend y mobile está en inglés, pero desde la creación del monorepo todos los commits nuevos van en español.
 
 ```
-<tipo>(<alcance>): <descripción en imperativo, minúscula, sin punto>
+<tipo>(<alcance>): <descripción en español, en imperativo, minúscula, sin punto>
 ```
 
-- **tipo:** `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `build`, `chore`, `perf`, `ci`.
+- **tipo:** se mantienen las palabras clave estándar de Conventional Commits, sin traducir: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `build`, `chore`, `perf`, `ci`.
 - **alcance:** el área afectada. Usa `backend` o `mobile` como alcance, o un alcance más fino precedido del proyecto si ayuda (por ejemplo `mobile/settings`, `backend/auth`). Para cambios en la raíz del monorepo usa `repo`.
+- **cuerpo (opcional):** también en español. Explica el porqué del cambio cuando no sea obvio.
 
 Ejemplos:
 
 ```
-feat(backend/auth): add refresh token endpoint
-fix(mobile/canvas): prevent node drag from scrolling the screen
-docs(repo): document how to run both projects
+feat(backend/auth): agrega endpoint de refresh token
+fix(mobile/canvas): evita que arrastrar un nodo desplace la pantalla
+docs(repo): documenta cómo arrancar ambos proyectos
 ```
 
 ## Verificación antes de commitear
