@@ -11,7 +11,13 @@ export function AmbientBackground({ children }: { children: React.ReactNode }) {
   const [lavender, sky, rose] = appleLight.blobs;
   return (
     <View style={styles.root}>
-      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 200" preserveAspectRatio="xMidYMid slice">
+      <Svg
+        width="100%"
+        height="100%"
+        style={StyleSheet.absoluteFill}
+        viewBox="0 0 100 200"
+        preserveAspectRatio="xMidYMid slice"
+      >
         <Defs>
           <Blob id="lavender" color={lavender} />
           <Blob id="sky" color={sky} />
