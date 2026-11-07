@@ -29,7 +29,7 @@ El primer paso es el login. Hay que construir un **kit de componentes estilo App
 ## Lo que sería un fracaso aunque funcione
 
 - **Que se vea "hecho con IA".** El usuario rechaza esa estética: degradados chillones, brillos de neón, sombras de colores, emojis como íconos o vidrio exagerado. El vidrio debe ser sutil y creíble, como en iOS. La jerarquía la da la tipografía.
-- Que se rompa el login real contra el backend, el registro, la validación o el desbloqueo con biometría.
+- Que se rompa el login real contra el backend, el registro o la validación.
 - Que se rompan las otras pantallas por tocar componentes compartidos.
 - Que se incluya la fuente SF Pro o los archivos de SF Symbols dentro de la app. La licencia de Apple solo permite usarlos en sus propias plataformas, mediante el sistema.
 
@@ -56,21 +56,13 @@ El primer paso es el login. Hay que construir un **kit de componentes estilo App
 
 - **Iniciar sesión.** El héroe dice "Bienvenido de nuevo / Tus casos, a salvo.". Los campos son correo y contraseña, con un botón para mostrar u ocultar la contraseña. El botón principal dice "Iniciar sesión" con una flecha.
 - **Crear cuenta.** El héroe dice "Crea tu cuenta / Empieza tu primer caso.". Los campos son nombre completo, correo, contraseña y confirmación. El botón dice "Crear cuenta" con un "+". No hay botón de biometría.
-- **Bloqueado.** Ocurre cuando hay una sesión guardada y la biometría está activa en Ajustes. No se muestran el selector ni los campos.
-  - **Héroe (decisión mía):** una línea pequeña en gris, "Hola de nuevo,". Debajo, el titular grande con **solo el nombre de pila** seguido de punto, por ejemplo "Jane.". Es la primera palabra de `user.fullName` y se trunca con puntos suspensivos si no cabe en una línea. Después va una línea en gris, "Desbloquea para ver tus expedientes.", que reemplaza a `login.lockedHint`.
-  - **Acciones (decisión mía):** una sola píldora de vidrio, "Desbloquear con Face ID" o "Desbloquear con huella", con su ícono en el círculo. Debajo, centrado, un enlace de texto "Usar otra cuenta". **No se usa el botón redondo**, porque haría lo mismo que la píldora.
+- **Sin estado bloqueado.** Por decisión del usuario, el login no tiene biometría. Si hay una sesión guardada, la app entra directo. `AuthContext` deja de usar el estado `locked`, y el interruptor de biometría de Ajustes deja de afectar al arranque.
 - **Enviando.** El botón principal muestra un indicador de carga y se desactiva.
 - **Error.** Se muestra el mensaje en línea. Se conserva el mapeo actual de códigos HTTP a textos.
 
-### Botón de biometría junto al botón principal
+### Biometría
 
-En el mockup, el botón redondo de Face ID aparece al lado de "Iniciar sesión". Pero hoy la biometría solo puede desbloquear una sesión que ya está guardada, que es el estado bloqueado. Con la sesión cerrada no tiene nada que desbloquear.
-
-**Decisión mía, no del usuario:**
-- En iniciar sesión y crear cuenta no hay botón de biometría.
-- En el estado bloqueado, la biometría es la píldora principal, como se describe arriba.
-- El enlace "Usar otra cuenta" llama a `signOut()`, que borra la sesión guardada, y muestra el formulario. Es una salida que hoy no existe: sin ella, un usuario bloqueado cuya biometría falla no puede entrar con contraseña.
-- `GlassIconButton` igual forma parte del kit y se usa en el botón de marca del héroe.
+El usuario decidió **quitar Face ID y la huella del login por completo**. No hay botón redondo de biometría, ni pantalla bloqueada, ni enlace "Usar otra cuenta". `GlassIconButton` sigue en el kit y se usa en el botón de marca del héroe.
 
 ## Tipografía
 
@@ -105,7 +97,6 @@ En el mockup, el botón redondo de Face ID aparece al lado de "Iniciar sesión".
 | Nombre | `person` | `person` |
 | Iniciar sesión | `arrow.right` | `arrow_forward` |
 | Crear cuenta | `plus` | `add` |
-| Face ID / huella | `faceid` / `touchid` | `fingerprint` |
 | Error | `exclamationmark.circle` | `error` |
 | Marca, en el botón redondo del héroe | queda a criterio de quien construya, con algo jurídico y sobrio como `building.columns` | equivalente, por ejemplo `account_balance` |
 
@@ -139,7 +130,7 @@ Los nombres son sugerencias. Pueden coincidir con los de `src/components/ui`, po
 ## Comportamiento que se conserva
 
 - Validación en el cliente: campos vacíos, formato de correo, contraseña de al menos 6 caracteres al registrarse y contraseñas iguales.
-- Llamadas a `signIn`, `signUp` y `unlockWithBiometrics` de `AuthContext`, sin cambiar sus firmas.
+- Llamadas a `signIn` y `signUp` de `AuthContext`, sin cambiar sus firmas.
 - El mapeo de errores HTTP actual: 400, 401 y 422 en el login; 409 para correo duplicado y 400 y 422 en el registro; y el error de red cuando no hay respuesta.
 - Al cambiar de pestaña se borra el error.
 - Navegación con el teclado: "siguiente" pasa al próximo campo y "listo" envía. Se conservan `textContentType` y `autoComplete` para que funcione el autocompletado de contraseñas de iOS.
@@ -167,7 +158,6 @@ Los nombres son sugerencias. Pueden coincidir con los de `src/components/ui`, po
 ## Otras decisiones mías, tomadas al revisar el diseño
 
 - **Pie de seguridad:** se quita la insignia "Cifrado / secure" que hoy aparece debajo de la tarjeta, por coherencia con el chip que el usuario pidió quitar. La clave `login.secure` puede quedar sin uso en esta pantalla.
-- **Texto de la biometría:** "Face ID" o "huella" se decide con `LocalAuthentication.supportedAuthenticationTypesAsync()`.
 - **Liquid Glass forzado a claro:** también cuando el sistema está en modo oscuro.
 - **Teclado:** el héroe se desplaza junto con el formulario cuando el teclado está abierto. No queda fijo.
 - **`App.tsx` se puede tocar:**
