@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { GlassSurface } from './GlassSurface';
 import { Text } from './Text';
 import { radii } from './tokens';
@@ -29,7 +29,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, s
   const x = useSharedValue(0);
 
   useEffect(() => {
-    x.set(withTiming(index * segment, { duration: 240 }));
+    x.set(withSpring(index * segment, { damping: 16, stiffness: 210, mass: 0.8 }));
   }, [index, segment, x]);
 
   const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));

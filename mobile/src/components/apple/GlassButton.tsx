@@ -1,11 +1,12 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { GlassSurface } from './GlassSurface';
 import { Symbol, SymbolKey } from './Symbol';
 import { Text } from './Text';
 import { radii } from './tokens';
 import { usePalette } from './usePalette';
+import { usePressFeedback } from './usePressFeedback';
 
 export interface GlassButtonProps {
   label: string;
@@ -20,37 +21,47 @@ export interface GlassButtonProps {
 
 const HEIGHT = 52;
 
-/** Botón píldora de vidrio claro con el ícono dentro de un círculo. */
+/**
+ * Botón píldora de vidrio con el ícono dentro de un círculo.
+ * Al tocarlo se hunde con resorte, se ilumina y el ícono avanza un poco.
+ */
 export function GlassButton({ label, onPress, icon, loading, disabled, style, accessibilityHint }: GlassButtonProps) {
   const palette = usePalette();
-  const scale = useSharedValue(1);
-  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
+  const press = usePressFeedback(0.95);
   const inactive = disabled || loading;
 
   return (
-    <Animated.View style={[animated, inactive && styles.dim, style]}>
+    <Animated.View style={[press.container, inactive && styles.dim, style]}>
       <Pressable
         onPress={onPress}
         disabled={inactive}
-        onPressIn={() => scale.set(withTiming(0.97, { duration: 90 }))}
-        onPressOut={() => scale.set(withTiming(1, { duration: 160 }))}
+        {...press.handlers}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={accessibilityHint}
         accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       >
         <GlassSurface radius={radii.pill} interactive contentStyle={styles.content}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              styles.highlight,
+              { backgroundColor: palette.mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.7)' },
+              press.highlight,
+            ]}
+          />
           <Text variant="callout" style={styles.label}>
             {label}
           </Text>
           {(icon || loading) && (
-            <View style={[styles.circle, { borderColor: palette.glass.ring }]}>
+            <Animated.View style={[styles.circle, { borderColor: palette.glass.ring }, !loading && press.nudge]}>
               {loading ? (
                 <ActivityIndicator size="small" color={palette.label} />
               ) : (
                 <Symbol name={icon!} size={13} weight="semibold" />
               )}
-            </View>
+            </Animated.View>
           )}
         </GlassSurface>
       </Pressable>
@@ -66,6 +77,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 20,
+  },
+  highlight: {
+    borderRadius: HEIGHT / 2,
   },
   label: {
     fontSize: 16.5,

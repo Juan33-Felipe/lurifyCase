@@ -4,6 +4,7 @@
  */
 export { appleLight, appleDark, radii, typography, fontWeight } from './tokens';
 export { usePalette } from './usePalette';
+export { usePressFeedback } from './usePressFeedback';
 export type { ApplePalette, TypographyVariant } from './tokens';
 export { Text } from './Text';
 export { Symbol, symbols } from './Symbol';
