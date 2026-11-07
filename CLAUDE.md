@@ -40,7 +40,7 @@ docs(repo): documenta cómo arrancar ambos proyectos
 
 ## Verificación antes de commitear
 
-- `backend/`: `mvn -q test` (o al menos `mvn -q compile` si no hay tests relacionados).
+- `backend/`: `./mvnw -q test` (o al menos `./mvnw -q compile` si no hay tests relacionados). En Windows usa `mvnw.cmd`.
 - `mobile/`: `npx expo lint` y `npx tsc --noEmit`.
 
 Si la verificación falla por un problema preexistente que no causaste, commitea igual tu cambio y avisa al usuario del fallo con la salida del error.

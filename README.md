@@ -32,7 +32,7 @@ Este repositorio es un monorepo con el backend y la app móvil.
 
 ## Arrancar
 
-Requisitos: Node 20+, Java 17, Maven y Docker Desktop.
+Requisitos: Node 20+, Java 17 y Docker Desktop. No hace falta instalar Maven: el backend trae el Maven Wrapper (`mvnw`).
 
 La primera vez, instala las dependencias:
 
