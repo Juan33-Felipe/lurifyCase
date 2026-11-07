@@ -4,7 +4,7 @@
   "description": "Monorepo Iurify Case: backend Spring Boot + app móvil Expo",
   "scripts": {
     "setup": "npm install && npm --prefix mobile install",
-    "dev": "node scripts/free-ports.mjs && node scripts/ensure-docker.mjs && docker compose -f backend/docker-compose.yml up -d --wait && concurrently --kill-others --names api,app --prefix-colors green,magenta --handle-input --default-input-target app \"node scripts/start-backend.mjs\" \"node scripts/start-mobile.mjs\"",
+    "dev": "node scripts/free-ports.mjs && node scripts/ensure-db.mjs && concurrently --kill-others --names api,app --prefix-colors green,magenta --handle-input --default-input-target app \"node scripts/start-backend.mjs\" \"node scripts/start-mobile.mjs\"",
     "dev:api": "node scripts/start-backend.mjs",
     "dev:app": "node scripts/start-mobile.mjs",
     "db:up": "node scripts/ensure-docker.mjs && docker compose -f backend/docker-compose.yml up -d --wait",
