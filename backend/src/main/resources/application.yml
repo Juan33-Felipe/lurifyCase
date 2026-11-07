@@ -1,10 +1,14 @@
 spring:
   application:
     name: iurifycase-backend
+  # Lee backend/.env si existe. Las variables de entorno del sistema tienen prioridad.
+  config:
+    import: optional:file:.env[.properties]
   datasource:
-    url: jdbc:postgresql://localhost:5432/iurify_case_db
-    username: iurify_user
-    password: iurify_secure_password_2026
+    # Por defecto, la base local de Docker (docker-compose.yml).
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/iurify_case_db}
+    username: ${DB_USERNAME:iurify_user}
+    password: ${DB_PASSWORD:iurify_secure_password_2026}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -16,7 +20,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 logging:
   level:
