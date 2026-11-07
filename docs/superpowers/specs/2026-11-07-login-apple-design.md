@@ -49,7 +49,6 @@ El primer paso es el login. Hay que construir un **kit de componentes estilo App
    - **Campos agrupados** en una tarjeta blanca redondeada de unos 16 pt, al estilo de Ajustes de iOS. Cada fila lleva un ícono a la izquierda y el campo de texto, separadas por líneas de 0,5 pt.
    - **Fila de acciones:**
      - Un **botón píldora de vidrio claro** que ocupa el ancho disponible. Lleva el texto y, a la derecha, un ícono dentro de un círculo con borde fino.
-     - En el modo que corresponda, un **botón redondo de vidrio claro** para la biometría.
    - Los mensajes de error van en línea, debajo de los campos, en rojo suave, con ícono y sin cajas llamativas.
 
 ### Estados
