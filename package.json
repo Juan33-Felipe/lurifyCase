@@ -1,0 +1,16 @@
+{
+  "name": "lurifycase",
+  "private": true,
+  "description": "Monorepo Iurify Case: backend Spring Boot + app móvil Expo",
+  "scripts": {
+    "setup": "npm install && npm --prefix mobile install",
+    "dev": "npm run db:up && concurrently --kill-others --names api,app --prefix-colors green,magenta --handle-input --default-input-target app \"npm:dev:api\" \"npm:dev:app\"",
+    "dev:api": "mvn -q -f backend/pom.xml spring-boot:run",
+    "dev:app": "node scripts/start-mobile.mjs",
+    "db:up": "node scripts/ensure-docker.mjs && docker compose -f backend/docker-compose.yml up -d --wait",
+    "db:down": "docker compose -f backend/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
