@@ -308,6 +308,31 @@ class IurifyCaseBackendLogicTest {
     }
 
     @Test
+    void registerShouldLetPersistenceAssignTheIdOfANewUser() {
+        // Spring Data hace merge (no insert) cuando la entidad ya trae id, y con Hibernate 6.6
+        // eso falla con "Row was updated or deleted by another transaction". Un usuario nuevo
+        // debe llegar al repositorio sin id para que JPA lo inserte y la base genere el UUID.
+        List<User> saved = new ArrayList<>();
+        UserRepository capturing = new UserRepository() {
+            public Optional<User> findByEmail(String email) { return Optional.empty(); }
+            public Optional<User> findById(UUID id) { return Optional.empty(); }
+            public User save(User user) {
+                saved.add(new User(user.getId(), user.getEmail(), user.getPasswordHash(), user.getFullName(),
+                        user.getBiometricPublicKey(), user.getAuthMethod(), user.getCreatedAt(), user.getUpdatedAt()));
+                if (user.getId() == null) user.setId(UUID.randomUUID());
+                return user;
+            }
+        };
+        AuthService service = new AuthService(capturing, new BCryptPasswordEncoder());
+
+        User registered = service.register("Ana Pérez", "ana.perez@lawfirm.example", "secreto123");
+
+        assertEquals(1, saved.size());
+        assertNull(saved.get(0).getId(), "register no debe asignar el id; lo genera la base de datos");
+        assertNotNull(registered.getId());
+    }
+
+    @Test
     void shouldRegisterNewUserSuccessfullyAndAuthenticate() {
         String fullName = "Carlos Santander, Esq.";
         String email = "carlos.santander@lawfirm.example";

@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -92,8 +91,9 @@ public class AuthService {
             throw new EmailAlreadyExistsException("Email already registered");
         }
 
+        // Sin id: un usuario nuevo debe insertarse (persist) y la base genera el UUID.
+        // Si trae id, Spring Data hace merge y Hibernate 6.6 lo rechaza.
         User user = new User();
-        user.setId(UUID.randomUUID());
         user.setEmail(normalizedEmail);
         user.setFullName(fullName.trim());
         user.setPasswordHash(passwordEncoder.encode(password));
