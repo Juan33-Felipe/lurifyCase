@@ -4,7 +4,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { GlassSurface } from './GlassSurface';
 import { Symbol, SymbolKey } from './Symbol';
 import { Text } from './Text';
-import { appleLight, radii } from './tokens';
+import { radii } from './tokens';
+import { usePalette } from './usePalette';
 
 export interface GlassButtonProps {
   label: string;
@@ -21,6 +22,7 @@ const HEIGHT = 52;
 
 /** Botón píldora de vidrio claro con el ícono dentro de un círculo. */
 export function GlassButton({ label, onPress, icon, loading, disabled, style, accessibilityHint }: GlassButtonProps) {
+  const palette = usePalette();
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
   const inactive = disabled || loading;
@@ -42,9 +44,9 @@ export function GlassButton({ label, onPress, icon, loading, disabled, style, ac
             {label}
           </Text>
           {(icon || loading) && (
-            <View style={styles.circle}>
+            <View style={[styles.circle, { borderColor: palette.glass.ring }]}>
               {loading ? (
-                <ActivityIndicator size="small" color={appleLight.label} />
+                <ActivityIndicator size="small" color={palette.label} />
               ) : (
                 <Symbol name={icon!} size={13} weight="semibold" />
               )}
@@ -73,7 +75,6 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 1.5,
-    borderColor: 'rgba(28,28,30,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },

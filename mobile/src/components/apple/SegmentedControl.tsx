@@ -3,7 +3,8 @@ import { LayoutChangeEvent, Pressable, StyleProp, StyleSheet, View, ViewStyle } 
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { GlassSurface } from './GlassSurface';
 import { Text } from './Text';
-import { appleLight, radii } from './tokens';
+import { radii } from './tokens';
+import { usePalette } from './usePalette';
 
 export interface SegmentOption<T extends string> {
   value: T;
@@ -21,6 +22,7 @@ const PADDING = 3;
 
 /** Selector segmentado de vidrio, con el segmento activo deslizándose. */
 export function SegmentedControl<T extends string>({ options, value, onChange, style }: SegmentedControlProps<T>) {
+  const palette = usePalette();
   const [width, setWidth] = useState(0);
   const index = Math.max(0, options.findIndex((o) => o.value === value));
   const segment = width > 0 ? (width - PADDING * 2) / options.length : 0;
@@ -40,7 +42,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, s
   return (
     <GlassSurface radius={radii.segment} elevated={false} style={style}>
       <View style={styles.row} onLayout={onLayout} accessibilityRole="tablist">
-        {segment > 0 && <Animated.View style={[styles.thumb, { width: segment }, thumb]} />}
+        {segment > 0 && <Animated.View style={[styles.thumb, { width: segment, backgroundColor: palette.glass.thumb }, thumb]} />}
         {options.map((o) => {
           const selected = o.value === value;
           return (
@@ -55,7 +57,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, s
               <Text
                 variant="subheadline"
                 weight={selected ? '600' : '500'}
-                color={selected ? appleLight.label : '#3A3A3C'}
+                color={selected ? palette.label : palette.segmentLabel}
                 numberOfLines={1}
               >
                 {o.label}
@@ -79,7 +81,6 @@ const styles = StyleSheet.create({
     bottom: PADDING,
     left: PADDING,
     borderRadius: radii.segment - PADDING,
-    backgroundColor: appleLight.glass.thumb,
     shadowColor: '#000',
     shadowOpacity: 0.12,
     shadowRadius: 4,

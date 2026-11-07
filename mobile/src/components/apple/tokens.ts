@@ -1,32 +1,86 @@
 import { Platform, TextStyle } from 'react-native';
 
 /**
- * Tokens del kit estilo Apple.
- * Por ahora solo existe la paleta clara. Para agregar el modo oscuro, crea `appleDark`
- * con la misma forma (`ApplePalette`) y elige la paleta según el tema.
+ * Tokens del kit estilo Apple. Hay paleta clara y oscura con la misma forma;
+ * los componentes eligen la correcta con `usePalette()` según el tema de Ajustes.
  */
-export const appleLight = {
+export interface ApplePalette {
+  mode: 'light' | 'dark';
+  groupedBackground: string;
+  surface: string;
+  label: string;
+  secondaryLabel: string;
+  placeholder: string;
+  separator: string;
+  segmentLabel: string;
+  heroTop: string;
+  heroBottom: string;
+  blobs: readonly [string, string, string];
+  blobOpacity: number;
+  danger: string;
+  glass: {
+    fillTop: string;
+    fillBottom: string;
+    border: string;
+    sheen: string;
+    ring: string;
+    shadow: string;
+    shadowOpacity: number;
+    thumb: string;
+  };
+}
+
+export const appleLight: ApplePalette = {
+  mode: 'light',
   groupedBackground: '#F2F2F7',
   surface: '#FFFFFF',
   label: '#1C1C1E',
   secondaryLabel: '#8E8E93',
   placeholder: '#A1A1A6',
   separator: '#E5E5EA',
+  segmentLabel: '#3A3A3C',
   heroTop: '#DFE5EC',
   heroBottom: '#D2DAE4',
-  blobs: ['#B8C6D6', '#C2D0CC', '#D3D9E2'] as const,
+  blobs: ['#B8C6D6', '#C2D0CC', '#D3D9E2'],
+  blobOpacity: 0.85,
   danger: '#D93036',
   glass: {
     fillTop: 'rgba(255,255,255,0.66)',
     fillBottom: 'rgba(255,255,255,0.38)',
     border: 'rgba(255,255,255,0.9)',
-    highlight: 'rgba(255,255,255,1)',
+    sheen: 'rgba(255,255,255,0.55)',
+    ring: 'rgba(28,28,30,0.5)',
     shadow: '#2E3A48',
+    shadowOpacity: 0.12,
     thumb: 'rgba(255,255,255,0.96)',
   },
 };
 
-export type ApplePalette = typeof appleLight;
+export const appleDark: ApplePalette = {
+  mode: 'dark',
+  groupedBackground: '#0A0C0F',
+  surface: '#1C1C1E',
+  label: '#F5F5F7',
+  secondaryLabel: '#98989F',
+  placeholder: '#6C6C72',
+  separator: '#38383A',
+  segmentLabel: '#C7C7CC',
+  heroTop: '#2A3441',
+  heroBottom: '#1B222C',
+  blobs: ['#2E4560', '#2A4038', '#38404C'],
+  blobOpacity: 0.9,
+  danger: '#FF453A',
+  glass: {
+    fillTop: 'rgba(255,255,255,0.16)',
+    fillBottom: 'rgba(255,255,255,0.06)',
+    border: 'rgba(255,255,255,0.16)',
+    sheen: 'rgba(255,255,255,0.12)',
+    ring: 'rgba(245,245,247,0.55)',
+    shadow: '#000000',
+    shadowOpacity: 0.4,
+    thumb: 'rgba(118,118,128,0.6)',
+  },
+};
 
 export const radii = {
   segment: 12,

@@ -2,14 +2,15 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Symbol } from './Symbol';
 import { Text } from './Text';
-import { appleLight } from './tokens';
+import { usePalette } from './usePalette';
 
 /** Mensaje de error en línea, discreto, debajo de los campos. */
 export function InlineMessage({ message }: { message: string }) {
+  const palette = usePalette();
   return (
     <View style={styles.row} accessibilityRole="alert" accessibilityLiveRegion="polite">
-      <Symbol name="error" size={15} color={appleLight.danger} style={styles.icon} />
-      <Text variant="footnote" color={appleLight.danger} style={styles.text}>
+      <Symbol name="error" size={15} color={palette.danger} style={styles.icon} />
+      <Text variant="footnote" color={palette.danger} style={styles.text}>
         {message}
       </Text>
     </View>

@@ -56,10 +56,10 @@ function Shell() {
   }
 
   if (status === 'signedOut') {
-    // El login tiene su propio fondo y por ahora siempre es claro.
+    // El login tiene su propio fondo y sigue el tema de Ajustes.
     return (
       <>
-        <StatusBar style="dark" />
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
         <LoginScreen />
       </>
     );

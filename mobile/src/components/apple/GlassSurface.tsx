@@ -3,7 +3,7 @@ import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { appleLight } from './tokens';
+import { usePalette } from './usePalette';
 
 export interface GlassSurfaceProps {
   radius: number;
@@ -17,20 +17,21 @@ export interface GlassSurfaceProps {
 }
 
 const nativeGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
-const g = appleLight.glass;
 
 /**
  * Vidrio claro.
- * - iOS 26 o superior: Liquid Glass nativo (expo-glass-effect), forzado a claro.
+ * - iOS 26 o superior: Liquid Glass nativo (expo-glass-effect), con el tema de la app.
  * - iOS anterior y web: desenfoque con expo-blur más relleno blanco translúcido.
  * - Android: relleno translúcido sin desenfoque (expo-blur requiere una vista de destino para difuminar).
  */
 export function GlassSurface({ radius, style, contentStyle, elevated = true, interactive, children }: GlassSurfaceProps) {
+  const palette = usePalette();
+  const g = palette.glass;
   if (nativeGlass) {
     return (
       <GlassView
         glassEffectStyle="regular"
-        colorScheme="light"
+        colorScheme={palette.mode}
         isInteractive={interactive}
         style={[{ borderRadius: radius, overflow: 'hidden' }, style, contentStyle]}
       >
@@ -40,10 +41,16 @@ export function GlassSurface({ radius, style, contentStyle, elevated = true, int
   }
 
   return (
-    <View style={[{ borderRadius: radius }, elevated && styles.shadow, style]}>
+    <View
+      style={[
+        { borderRadius: radius },
+        elevated && [styles.shadow, { shadowColor: g.shadow, shadowOpacity: g.shadowOpacity }],
+        style,
+      ]}
+    >
       <View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}>
         {Platform.OS !== 'android' && (
-          <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={40} tint={palette.mode} style={StyleSheet.absoluteFill} />
         )}
         <LinearGradient
           colors={[g.fillTop, g.fillBottom]}
@@ -51,13 +58,13 @@ export function GlassSurface({ radius, style, contentStyle, elevated = true, int
         />
         {/* Brillo del borde superior, como el reflejo del vidrio de iOS. */}
         <LinearGradient
-          colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']}
+          colors={[g.sheen, 'rgba(255,255,255,0)']}
           style={[styles.sheen, { borderTopLeftRadius: radius, borderTopRightRadius: radius }]}
         />
       </View>
       <View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, styles.border, { borderRadius: radius }]}
+        style={[StyleSheet.absoluteFill, styles.border, { borderRadius: radius, borderColor: g.border }]}
       />
       <View style={contentStyle}>{children}</View>
     </View>
@@ -66,8 +73,6 @@ export function GlassSurface({ radius, style, contentStyle, elevated = true, int
 
 const styles = StyleSheet.create({
   shadow: {
-    shadowColor: g.shadow,
-    shadowOpacity: 0.12,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
@@ -81,6 +86,5 @@ const styles = StyleSheet.create({
   },
   border: {
     borderWidth: 1,
-    borderColor: g.border,
   },
 });

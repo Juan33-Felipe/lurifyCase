@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
-import { appleLight } from './tokens';
+import { usePalette } from './usePalette';
 
 type SymbolName = Exclude<SymbolViewProps['name'], string>;
 
@@ -31,12 +31,13 @@ export interface AppleSymbolProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function Symbol({ name, size = 17, color = appleLight.label, weight = 'regular', style }: AppleSymbolProps) {
+export function Symbol({ name, size = 17, color, weight = 'regular', style }: AppleSymbolProps) {
+  const palette = usePalette();
   return (
     <SymbolView
       name={symbols[name]}
       size={size}
-      tintColor={color}
+      tintColor={color ?? palette.label}
       weight={weight}
       style={style}
       accessibilityElementsHidden

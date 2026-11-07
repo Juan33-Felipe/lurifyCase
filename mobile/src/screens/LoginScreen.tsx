@@ -13,7 +13,7 @@ import {
   Text,
   TextFieldRow,
   TextFieldRowRef,
-  appleLight,
+  usePalette,
 } from '../components/apple';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
@@ -25,12 +25,13 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * Pantalla de autenticación (RF-008), con el kit estilo Apple.
  * Diseño: docs/superpowers/specs/2026-11-07-login-apple-design.md
- * Siempre en modo claro. Sin biometría: la sesión guardada entra directo.
+ * Sigue el tema claro u oscuro de Ajustes. Sin biometría: la sesión guardada entra directo.
  */
 export default function LoginScreen() {
   const { t } = useSettings();
   const { signIn, signUp } = useAuth();
   const insets = useSafeAreaInsets();
+  const palette = usePalette();
 
   const [activeTab, setActiveTab] = useState<AuthTab>('login');
   const [fullName, setFullName] = useState('');
@@ -122,13 +123,13 @@ export default function LoginScreen() {
           <HeroCard>
             <View style={styles.brandRow}>
               <Text variant="headline">
-                Iurify <Text variant="headline" weight="500" color={appleLight.secondaryLabel}>Case</Text>
+                Iurify <Text variant="headline" weight="500" color={palette.secondaryLabel}>Case</Text>
               </Text>
               <GlassIconButton icon="brand" size={36} accessibilityLabel="Iurify Case" />
             </View>
 
             <Animated.View key={activeTab} entering={FadeIn.duration(260)} style={styles.heroText}>
-              <Text variant="subheadline" weight="500" color={appleLight.secondaryLabel}>
+              <Text variant="subheadline" weight="500" color={palette.secondaryLabel}>
                 {isLogin ? t('login.heroOverline') : t('login.registerOverline')}
               </Text>
               <Text variant="display" style={styles.headline} accessibilityRole="header">
