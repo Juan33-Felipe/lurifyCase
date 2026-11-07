@@ -113,7 +113,7 @@ export default function SettingsScreen() {
                 ]}
               />
             </Row>
-            <View style={[styles.securityRow, { paddingHorizontal: 0, paddingTop: 14 }]}>
+            <View style={styles.securityRow}>
               <View
                 style={[
                   styles.securityIconBox,

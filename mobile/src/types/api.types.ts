@@ -109,6 +109,12 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface RegisterRequest {
+  fullName: string;
+  email: string;
+  password: string;
+}
+
 export interface AuthTokenResponse {
   accessToken: string;
   tokenType: 'Bearer';
