@@ -50,6 +50,14 @@ El backend lee la conexión de `backend/.env`. Ese archivo no se sube a git.
 
 Pide los datos de Neon a quien administre el proyecto. Nunca los subas al repositorio.
 
+Para administrar Neon desde la terminal, el repo trae `neonctl` configurado con el perfil `juan`, que corresponde a la cuenta dueña del proyecto. Así no se mezcla con otras cuentas de Neon que tengas en el equipo:
+
+```bash
+npm run neon:login                 # una vez: inicia sesión con la cuenta de Juan
+npm run neon -- projects list      # cualquier comando de neonctl
+npm run neon -- connection-string --project-id shy-king-70398922 --pooled
+```
+
 ### Comando de desarrollo
 
 Después, un solo comando levanta todo:

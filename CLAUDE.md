@@ -44,3 +44,9 @@ docs(repo): documenta cómo arrancar ambos proyectos
 - `mobile/`: `npx expo lint` y `npx tsc --noEmit`.
 
 Si la verificación falla por un problema preexistente que no causaste, commitea igual tu cambio y avisa al usuario del fallo con la salida del error.
+
+## Base de datos y Neon
+
+- La conexión del backend está en `backend/.env` (ignorado por git; plantilla en `backend/.env.example`). Nunca subas credenciales.
+- La base remota es el proyecto `lurifyCase` de Neon (id `shy-king-70398922`) en la cuenta de Juan.
+- **Para Neon en este proyecto usa siempre `npm run neon -- <comando>`**, que fuerza el perfil `juan`. Nunca uses `neonctl` o `npx neonctl` sin `--profile juan`: el perfil por defecto del equipo es otra cuenta.
