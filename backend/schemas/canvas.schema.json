@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.iurifycase.example/v1/canvas.schema.json",
+  "title": "Iurify Case Canvas",
+  "description": "Graph representation of a legal case theory. Nodes are legal elements (facts, evidence, legal norms, case law); edges are typed legal relationships between them. Referential integrity (edge.source/edge.target must reference existing node ids), id uniqueness and absence of self-loops cannot be expressed in JSON Schema and are enforced by the backend (error code CANVAS_INTEGRITY_VIOLATION).",
+  "type": "object",
+  "required": ["nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/Node" }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 2000,
+      "items": { "$ref": "#/$defs/Edge" }
+    }
+  },
+  "$defs": {
+    "Uuid": {
+      "description": "RFC 9562 UUID. The pattern guarantees validation even when the validator treats 'format' as an annotation only.",
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "NodeType": {
+      "description": "FACT: an alleged or proven event. EVIDENCE: a means of proof. LAW: a statutory/regulatory norm. JURISPRUDENCE: a judicial precedent or case-law criterion.",
+      "type": "string",
+      "enum": ["FACT", "EVIDENCE", "LAW", "JURISPRUDENCE"]
+    },
+    "RelationshipType": {
+      "description": "SUPPORTS: source strengthens target (typically EVIDENCE -> FACT). CONTRADICTS: source weakens or is incompatible with target. DERIVES_FROM: source is inferred from target (fact chains, presumptions). APPLIES_TO: a norm or precedent governs a fact (LAW|JURISPRUDENCE -> FACT). INTERPRETS: a precedent interprets a norm (JURISPRUDENCE -> LAW). Type-pair conventions are guidance; atypical pairs are flagged by the AI audit, not rejected.",
+      "type": "string",
+      "enum": ["SUPPORTS", "CONTRADICTS", "DERIVES_FROM", "APPLIES_TO", "INTERPRETS"]
+    },
+    "Origin": {
+      "description": "Who created the element. AI_GENERATED elements come from narrative processing; USER_CREATED elements come from manual canvas edits.",
+      "type": "string",
+      "enum": ["AI_GENERATED", "USER_CREATED"]
+    },
+    "Position": {
+      "description": "Top-left anchor of the node in logical (device-independent) canvas units. Bounded to keep rendering numerically safe.",
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": -100000, "maximum": 100000 },
+        "y": { "type": "number", "minimum": -100000, "maximum": 100000 }
+      }
+    },
+    "NodeTitle": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "\\S"
+    },
+    "NodeContent": {
+      "type": "string",
+      "maxLength": 10000
+    },
+    "Node": {
+      "type": "object",
+      "required": ["id", "type", "title", "content", "position", "origin", "userModified"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/Uuid" },
+        "type": { "$ref": "#/$defs/NodeType" },
+        "title": { "$ref": "#/$defs/NodeTitle" },
+        "content": { "$ref": "#/$defs/NodeContent" },
+        "position": { "$ref": "#/$defs/Position" },
+        "origin": { "$ref": "#/$defs/Origin" },
+        "userModified": {
+          "description": "True when a lawyer changed type, title or content of the node after creation. Position changes do not set this flag (layout is not legal content). AI re-processing must never overwrite nodes where origin = USER_CREATED or userModified = true.",
+          "type": "boolean"
+        }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["id", "source", "target", "relationshipType", "origin", "userModified"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/Uuid" },
+        "source": { "$ref": "#/$defs/Uuid" },
+        "target": { "$ref": "#/$defs/Uuid" },
+        "relationshipType": { "$ref": "#/$defs/RelationshipType" },
+        "origin": { "$ref": "#/$defs/Origin" },
+        "userModified": {
+          "description": "True when a lawyer changed the relationshipType of an AI-generated edge.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

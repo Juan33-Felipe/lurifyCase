@@ -1,0 +1,1592 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://spec.openapis.org/oas/3.1/dialect/base
+
+info:
+  title: Iurify Case API
+  version: 1.0.0
+  summary: Public REST contract between the Iurify Case mobile application and its backend.
+  description: |
+    Iurify Case lets lawyers turn a case narrative (text or voice) into an
+    interactive legal graph ("canvas"), edit it, audit it with AI and generate
+    technical legal documents from it.
+
+    ## Contract conventions
+    - All routes are versioned under `/api/v1`.
+    - Every endpoint except `POST /api/v1/auth/login` requires `Authorization: Bearer <JWT>`.
+    - JSON field names use `camelCase`; enum values use `UPPER_SNAKE_CASE`.
+    - IDs are UUIDs. Timestamps are RFC 3339 (`date-time`) in UTC.
+    - `400` = the request could not be parsed (malformed JSON / multipart).
+      `422` = the request was parsed but violates the schema or business rules.
+    - Cases owned by another user are reported as `404` (never `403`) to avoid
+      disclosing the existence of sensitive legal matters.
+    - All errors use the `Error` schema. Clients must ignore unknown error `code`s
+      and fall back to the HTTP status.
+    - State-changing endpoints that a mobile client may retry after a network
+      failure require an `Idempotency-Key` header (see the parameter description).
+    - AI and speech-to-text providers are internal to the backend and are never
+      exposed by this contract. AI output is always a draft for professional review.
+    - Schemas are closed (`additionalProperties: false`). New optional response
+      fields may be added within v1; clients must act as tolerant readers.
+
+servers:
+  - url: https://api.iurifycase.example
+    description: Placeholder host. Real hosts are environment-specific.
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Authentication
+    description: Lawyer authentication.
+  - name: Cases
+    description: Legal case files owned by the authenticated lawyer.
+  - name: Narratives
+    description: Text or voice narrative ingestion and AI extraction into the canvas.
+  - name: Canvas
+    description: Retrieval and incremental synchronization of the case graph.
+  - name: Audit
+    description: AI analysis of the current case theory.
+  - name: Documents
+    description: Asynchronous generation of technical legal documents.
+
+paths:
+  # ---------------------------------------------------------------------------
+  # AUTHENTICATION
+  # ---------------------------------------------------------------------------
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Authenticate a lawyer and obtain an access token
+      description: |
+        Public endpoint. Exchanges credentials for a short-lived JWT access token.
+        The password is never returned. Repeated failures are rate limited (`429`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: lawyer@example.com
+              password: correct-horse-battery-staple
+      responses:
+        '200':
+          description: Authenticated.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # CASES
+  # ---------------------------------------------------------------------------
+  /api/v1/cases:
+    get:
+      tags: [Cases]
+      operationId: listCases
+      summary: List the authenticated lawyer's cases
+      parameters:
+        - $ref: '#/components/parameters/CaseStatusFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of cases, most recently updated first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Cases]
+      operationId: createCase
+      summary: Create a new case file
+      description: Creates a case with an empty canvas at `canvasVersion = 0`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCaseRequest'
+      responses:
+        '201':
+          description: Case created.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Case'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/cases/{caseId}:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    get:
+      tags: [Cases]
+      operationId: getCase
+      summary: Get case metadata
+      responses:
+        '200':
+          description: The case.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Case'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Cases]
+      operationId: updateCase
+      summary: Update case metadata
+      description: |
+        Partial update. Omitted fields are left unchanged. Optional text fields
+        are cleared by sending an empty string. Naturally idempotent (same body,
+        same result), so no `Idempotency-Key` is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCaseRequest'
+      responses:
+        '200':
+          description: Updated case.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Case'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # NARRATIVE INGESTION
+  # ---------------------------------------------------------------------------
+  /api/v1/cases/{caseId}/narrative:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [Narratives]
+      operationId: submitNarrative
+      summary: Submit a case narrative (text or voice) and receive the updated canvas
+      description: |
+        Workflow: (speech-to-text if audio) -> AI legal extraction -> canvas merge
+        -> persistence -> response.
+
+        **Merge semantics (v1):** extracted nodes/edges are *appended* to the
+        canvas with `origin = AI_GENERATED`. Existing nodes and edges are never
+        modified or deleted by this operation. The canvas version is incremented.
+
+        **Content types:**
+        - `application/json` for typed narratives (`inputType = TEXT`).
+        - `multipart/form-data` for dictated narratives (`inputType = VOICE`).
+          The `audio` part must declare an `audio/*` media type. The set of
+          accepted containers/codecs is a server configuration; unsupported ones
+          return `415` with the accepted list in `details.supportedMediaTypes`.
+
+        **Retries:** processing may take tens of seconds. If the connection
+        drops, retry with the same `Idempotency-Key`: the stored result is
+        returned once available, or `409 IDEMPOTENCY_REQUEST_IN_PROGRESS` while
+        still processing.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextNarrativeRequest'
+            example:
+              inputType: TEXT
+              text: El 3 de marzo mi cliente fue despedido sin carta de preaviso tras reclamar horas extras...
+              language: es-PE
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VoiceNarrativeRequest'
+            encoding:
+              audio:
+                contentType: audio/*
+              inputType:
+                contentType: text/plain
+              language:
+                contentType: text/plain
+      responses:
+        '200':
+          description: Narrative processed; the updated canvas is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NarrativeProcessingResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ---------------------------------------------------------------------------
+  # CANVAS
+  # ---------------------------------------------------------------------------
+  /api/v1/cases/{caseId}/canvas:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    get:
+      tags: [Canvas]
+      operationId: getCanvas
+      summary: Get the current server canvas (last known server state)
+      description: Used on first load, after reconnecting, and to rebase after a `409` conflict.
+      responses:
+        '200':
+          description: Current canvas snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasSnapshot'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Canvas]
+      operationId: syncCanvas
+      summary: Synchronize manual canvas edits
+      description: |
+        Applies an ordered list of entity-level operations to the canvas.
+
+        - **Optimistic concurrency:** `baseVersion` must equal the current server
+          version, otherwise `409 CANVAS_VERSION_CONFLICT` is returned with the
+          current server snapshot so the client can rebase its pending operations.
+        - **Atomicity:** operations are applied in order, all-or-nothing. If one
+          fails, nothing is persisted and `422 CANVAS_INTEGRITY_VIOLATION` reports
+          the failing index in `details.operationIndex`.
+        - **Cascade:** `DELETE_NODE` also deletes every edge connected to the node.
+        - **Provenance:** added elements get `origin = USER_CREATED`; changing
+          type/title/content of a node (or relationshipType of an edge) sets
+          `userModified = true`. Position-only changes do not.
+        - **Retries:** a lost response must be retried with the same
+          `Idempotency-Key`; the stored result is replayed instead of a false `409`.
+        - On success the version is incremented by exactly 1 and the full
+          resulting snapshot is returned.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasSyncRequest'
+            example:
+              baseVersion: 7
+              operations:
+                - op: ADD_NODE
+                  node:
+                    id: 4b0f6c2e-8a51-4d6e-9f43-2b7a1c9d0e11
+                    type: EVIDENCE
+                    title: Correo del 2 de marzo
+                    content: Correo del gerente anunciando la desvinculación.
+                    position: { x: 420, y: 180 }
+                - op: ADD_EDGE
+                  edge:
+                    id: 9c3e1a7d-2f64-4b8a-a1d5-6e0f7b2c3d44
+                    source: 4b0f6c2e-8a51-4d6e-9f43-2b7a1c9d0e11
+                    target: 1d2e3f40-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+                    relationshipType: SUPPORTS
+                - op: UPDATE_NODE
+                  nodeId: 1d2e3f40-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+                  changes:
+                    position: { x: 120, y: 200 }
+                - op: DELETE_EDGE
+                  edgeId: 7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d
+      responses:
+        '200':
+          description: All operations applied. Resulting canvas returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanvasSnapshot'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/CanvasVersionConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------------------
+  # AUDIT
+  # ---------------------------------------------------------------------------
+  /api/v1/cases/{caseId}/audit:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    post:
+      tags: [Audit]
+      operationId: auditCase
+      summary: Run an AI audit of the current case theory
+      description: |
+        Synchronous, side-effect-free analysis of the canvas at `canvasVersion`.
+        If the client's version is not the current server version, `409` is
+        returned so that the lawyer never receives alerts about a canvas they
+        are not looking at (e.g. unsynchronized offline edits).
+        POST is used because the operation is a computation with a request body,
+        not a retrieval of a stored resource. Retrying is safe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditRequest'
+            example:
+              canvasVersion: 8
+      responses:
+        '200':
+          description: Audit completed. `alerts` may be empty.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/CanvasVersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ---------------------------------------------------------------------------
+  # DOCUMENTS
+  # ---------------------------------------------------------------------------
+  /api/v1/cases/{caseId}/documents:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List generated documents of a case (without content)
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of document summaries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Documents]
+      operationId: generateDocument
+      summary: Request asynchronous generation of a legal document
+      description: |
+        Long-form generation is asynchronous: the server accepts the job, returns
+        `202` with a `Document` in `PENDING` status and a `Location` header, and
+        the client polls `GET .../documents/{documentId}` (honouring `Retry-After`)
+        until the status is `COMPLETED` or `FAILED`. The document is pinned to
+        `canvasVersion`; a stale version returns `409`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentGenerationRequest'
+            example:
+              documentType: LEGAL_BRIEF
+              canvasVersion: 8
+              instructions: Enfatizar la ausencia de preaviso y la cronología del despido.
+              language: es-PE
+      responses:
+        '202':
+          description: Generation accepted.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/CanvasVersionConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/cases/{caseId}/documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/CaseId'
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Get a document (generation status, metadata and content when completed)
+      responses:
+        '200':
+          description: The document. While not terminal, a `Retry-After` header suggests the next poll.
+          headers:
+            Retry-After:
+              $ref: '#/components/headers/RetryAfter'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  # ===========================================================================
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived JWT access token obtained from `POST /api/v1/auth/login`.
+
+  # ===========================================================================
+  parameters:
+    CaseId:
+      name: caseId
+      in: path
+      required: true
+      description: Case identifier.
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      description: Document identifier.
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Client-generated UUID identifying one logical operation. The server stores
+        the outcome for at least 24 hours and replays it for retries with the same
+        key. Reusing a key with a different body returns `422 IDEMPOTENCY_KEY_REUSED`;
+        retrying while the original is still running returns
+        `409 IDEMPOTENCY_REQUEST_IN_PROGRESS`.
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor from `page.nextCursor` of a previous response.
+      schema:
+        type: string
+        maxLength: 512
+    CaseStatusFilter:
+      name: status
+      in: query
+      required: false
+      description: Filter by case status. Omit to return all.
+      schema:
+        $ref: '#/components/schemas/CaseStatus'
+
+  # ===========================================================================
+  headers:
+    Location:
+      description: URL of the created or accepted resource.
+      schema:
+        type: string
+        format: uri-reference
+    RetryAfter:
+      description: Seconds the client should wait before retrying or polling.
+      schema:
+        type: integer
+        minimum: 0
+    CacheControlNoStore:
+      description: Prevents caching of credentials-bearing responses.
+      schema:
+        type: string
+        const: no-store
+    WwwAuthenticate:
+      description: Authentication challenge (RFC 6750).
+      schema:
+        type: string
+        examples:
+          - Bearer error="invalid_token"
+
+  # ===========================================================================
+  responses:
+    BadRequest:
+      description: Malformed request (unparseable JSON or multipart body).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: MALFORMED_REQUEST
+            message: The request body is not valid JSON.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+    Unauthorized:
+      description: Missing, invalid or expired access token.
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/WwwAuthenticate'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: TOKEN_EXPIRED
+            message: The access token has expired. Please sign in again.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+    InvalidCredentials:
+      description: Email or password incorrect. The response does not reveal which.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_CREDENTIALS
+            message: Invalid email or password.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+    NotFound:
+      description: The resource does not exist or is not owned by the authenticated lawyer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: CASE_NOT_FOUND
+            message: The requested case does not exist.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+    Conflict:
+      description: The request conflicts with an in-flight request using the same Idempotency-Key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: IDEMPOTENCY_REQUEST_IN_PROGRESS
+            message: A request with this Idempotency-Key is still being processed.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: true
+    CanvasVersionConflict:
+      description: |
+        The client's canvas version is stale (`CANVAS_VERSION_CONFLICT`) or an
+        identical request is still in flight (`IDEMPOTENCY_REQUEST_IN_PROGRESS`,
+        returned with the generic `Error` shape).
+      content:
+        application/json:
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/CanvasVersionConflictError'
+              - $ref: '#/components/schemas/Error'
+    PayloadTooLarge:
+      description: Request body or uploaded audio exceeds the configured limit.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PAYLOAD_TOO_LARGE
+            message: The audio file exceeds the maximum allowed size.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+            details:
+              maxBytes: 26214400
+    UnsupportedMediaType:
+      description: Request Content-Type or audio media type not supported.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNSUPPORTED_MEDIA_TYPE
+            message: The audio format is not supported.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+            details:
+              supportedMediaTypes: [audio/mp4, audio/mpeg, audio/wav, audio/webm]
+    UnprocessableEntity:
+      description: |
+        Well-formed request that violates the schema or business rules
+        (e.g. `VALIDATION_FAILED`, `CANVAS_INTEGRITY_VIOLATION`,
+        `NO_SPEECH_DETECTED`, `IDEMPOTENCY_KEY_REUSED`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: CANVAS_INTEGRITY_VIOLATION
+            message: Edge target does not reference an existing node.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: false
+            details:
+              operationIndex: 1
+            fieldErrors:
+              - pointer: /operations/1/edge/target
+                code: NODE_NOT_FOUND
+                message: Node 1d2e3f40-5a6b-4c7d-8e9f-0a1b2c3d4e5f does not exist.
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: RATE_LIMIT_EXCEEDED
+            message: Too many requests. Try again later.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: true
+    InternalServerError:
+      description: Unexpected server error. No internal details are disclosed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INTERNAL_ERROR
+            message: An unexpected error occurred.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: true
+    BadGateway:
+      description: |
+        An internal processing service failed or returned unusable output
+        (`AI_PROCESSING_FAILED`, `SPEECH_TO_TEXT_FAILED`). No canvas changes
+        were persisted. Provider identity and raw output are never disclosed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: SPEECH_TO_TEXT_FAILED
+            message: The audio could not be transcribed. Please try again.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: true
+    ServiceUnavailable:
+      description: Processing capacity temporarily unavailable.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: SERVICE_UNAVAILABLE
+            message: The analysis service is temporarily unavailable.
+            traceId: 4bf92f3577b34da6a3ce929d0e0e4736
+            retryable: true
+
+  # ===========================================================================
+  schemas:
+    # ---------------------------------------------------------------- primitives
+    Uuid:
+      type: string
+      format: uuid
+      pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      examples:
+        - 1d2e3f40-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+    Timestamp:
+      type: string
+      format: date-time
+      description: RFC 3339 timestamp in UTC.
+      examples:
+        - '2026-10-05T06:38:58Z'
+    CanvasVersion:
+      type: integer
+      format: int64
+      minimum: 0
+      description: Monotonically increasing canvas revision. Incremented by 1 on every persisted canvas change.
+    LanguageTag:
+      type: string
+      description: BCP 47 language tag. When omitted, the account default is used.
+      pattern: '^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$'
+      maxLength: 35
+      examples:
+        - es-PE
+    PageInfo:
+      type: object
+      additionalProperties: false
+      required: [hasMore]
+      properties:
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: string
+          description: Present only when `hasMore` is true.
+
+    # ------------------------------------------------------------ authentication
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+    AuthTokenResponse:
+      type: object
+      additionalProperties: false
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken:
+          type: string
+          description: JWT to send as `Authorization: Bearer <accessToken>`. Treat as opaque.
+        tokenType:
+          type: string
+          const: Bearer
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Token lifetime in seconds from issuance. Relative to avoid device clock skew.
+        user:
+          $ref: '#/components/schemas/UserProfile'
+    UserProfile:
+      type: object
+      additionalProperties: false
+      required: [id, email, fullName]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+          maxLength: 200
+
+    # ---------------------------------------------------------------------- cases
+    CaseStatus:
+      type: string
+      enum: [ACTIVE, ARCHIVED]
+    CaseTitle:
+      type: string
+      minLength: 1
+      maxLength: 200
+      pattern: '\S'
+    CaseDescription:
+      type: string
+      maxLength: 2000
+    ClientReference:
+      type: string
+      maxLength: 100
+      description: Lawyer's internal file/docket reference.
+    Case:
+      type: object
+      additionalProperties: false
+      required: [id, title, status, canvasVersion, createdAt, updatedAt]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        title:
+          $ref: '#/components/schemas/CaseTitle'
+        description:
+          $ref: '#/components/schemas/CaseDescription'
+        clientReference:
+          $ref: '#/components/schemas/ClientReference'
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+        canvasVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+    CreateCaseRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title:
+          $ref: '#/components/schemas/CaseTitle'
+        description:
+          $ref: '#/components/schemas/CaseDescription'
+        clientReference:
+          $ref: '#/components/schemas/ClientReference'
+    UpdateCaseRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          $ref: '#/components/schemas/CaseTitle'
+        description:
+          $ref: '#/components/schemas/CaseDescription'
+        clientReference:
+          $ref: '#/components/schemas/ClientReference'
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+    CaseList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Case'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+
+    # --------------------------------------------------------------------- canvas
+    NodeType:
+      type: string
+      enum: [FACT, EVIDENCE, LAW, JURISPRUDENCE]
+      description: |
+        FACT: alleged or proven event. EVIDENCE: means of proof.
+        LAW: statutory/regulatory norm. JURISPRUDENCE: judicial precedent.
+    RelationshipType:
+      type: string
+      enum: [SUPPORTS, CONTRADICTS, DERIVES_FROM, APPLIES_TO, INTERPRETS]
+      description: |
+        SUPPORTS: source strengthens target (typically EVIDENCE -> FACT).
+        CONTRADICTS: source weakens or is incompatible with target.
+        DERIVES_FROM: source is inferred from target.
+        APPLIES_TO: a norm or precedent governs a fact.
+        INTERPRETS: a precedent interprets a norm.
+        Type-pair conventions are guidance; atypical pairs are flagged by the audit, not rejected.
+    Origin:
+      type: string
+      enum: [AI_GENERATED, USER_CREATED]
+    Position:
+      type: object
+      additionalProperties: false
+      required: [x, y]
+      description: Node anchor in logical (device-independent) canvas units.
+      properties:
+        x:
+          type: number
+          minimum: -100000
+          maximum: 100000
+        y:
+          type: number
+          minimum: -100000
+          maximum: 100000
+    NodeTitle:
+      type: string
+      minLength: 1
+      maxLength: 200
+      pattern: '\S'
+    NodeContent:
+      type: string
+      maxLength: 10000
+    Node:
+      type: object
+      additionalProperties: false
+      required: [id, type, title, content, position, origin, userModified]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        type:
+          $ref: '#/components/schemas/NodeType'
+        title:
+          $ref: '#/components/schemas/NodeTitle'
+        content:
+          $ref: '#/components/schemas/NodeContent'
+        position:
+          $ref: '#/components/schemas/Position'
+        origin:
+          $ref: '#/components/schemas/Origin'
+        userModified:
+          type: boolean
+          description: |
+            True when the lawyer changed type, title or content after creation.
+            Position changes do not set it. AI processing never overwrites nodes
+            with `origin = USER_CREATED` or `userModified = true`.
+    Edge:
+      type: object
+      additionalProperties: false
+      required: [id, source, target, relationshipType, origin, userModified]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        source:
+          $ref: '#/components/schemas/Uuid'
+        target:
+          $ref: '#/components/schemas/Uuid'
+        relationshipType:
+          $ref: '#/components/schemas/RelationshipType'
+        origin:
+          $ref: '#/components/schemas/Origin'
+        userModified:
+          type: boolean
+          description: True when the lawyer changed `relationshipType` after creation.
+    Canvas:
+      type: object
+      additionalProperties: false
+      required: [nodes, edges]
+      description: |
+        Case graph. Backend-enforced invariants (not expressible in JSON Schema):
+        unique ids, edge source/target reference existing nodes, no self-loops.
+      properties:
+        nodes:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/Node'
+        edges:
+          type: array
+          maxItems: 2000
+          items:
+            $ref: '#/components/schemas/Edge'
+    CanvasSnapshot:
+      type: object
+      additionalProperties: false
+      required: [caseId, version, updatedAt, canvas]
+      description: Canvas plus the synchronization metadata the client stores as "last known server state".
+      properties:
+        caseId:
+          $ref: '#/components/schemas/Uuid'
+        version:
+          $ref: '#/components/schemas/CanvasVersion'
+        updatedAt:
+          $ref: '#/components/schemas/Timestamp'
+        canvas:
+          $ref: '#/components/schemas/Canvas'
+
+    # ------------------------------------------------------- canvas sync (writes)
+    NodeInput:
+      type: object
+      additionalProperties: false
+      required: [id, type, title, content, position]
+      description: Node created by the client. `id` is generated on the device to allow offline creation.
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        type:
+          $ref: '#/components/schemas/NodeType'
+        title:
+          $ref: '#/components/schemas/NodeTitle'
+        content:
+          $ref: '#/components/schemas/NodeContent'
+        position:
+          $ref: '#/components/schemas/Position'
+    NodeChanges:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: Fields to change. Omitted fields are unchanged.
+      properties:
+        type:
+          $ref: '#/components/schemas/NodeType'
+        title:
+          $ref: '#/components/schemas/NodeTitle'
+        content:
+          $ref: '#/components/schemas/NodeContent'
+        position:
+          $ref: '#/components/schemas/Position'
+    EdgeInput:
+      type: object
+      additionalProperties: false
+      required: [id, source, target, relationshipType]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        source:
+          $ref: '#/components/schemas/Uuid'
+        target:
+          $ref: '#/components/schemas/Uuid'
+        relationshipType:
+          $ref: '#/components/schemas/RelationshipType'
+    EdgeChanges:
+      type: object
+      additionalProperties: false
+      required: [relationshipType]
+      description: Only the relationship type is mutable. Reconnecting an edge is DELETE_EDGE + ADD_EDGE.
+      properties:
+        relationshipType:
+          $ref: '#/components/schemas/RelationshipType'
+    AddNodeOperation:
+      type: object
+      additionalProperties: false
+      required: [op, node]
+      properties:
+        op:
+          type: string
+          const: ADD_NODE
+        node:
+          $ref: '#/components/schemas/NodeInput'
+    UpdateNodeOperation:
+      type: object
+      additionalProperties: false
+      required: [op, nodeId, changes]
+      properties:
+        op:
+          type: string
+          const: UPDATE_NODE
+        nodeId:
+          $ref: '#/components/schemas/Uuid'
+        changes:
+          $ref: '#/components/schemas/NodeChanges'
+    DeleteNodeOperation:
+      type: object
+      additionalProperties: false
+      required: [op, nodeId]
+      description: Deletes the node and every edge connected to it.
+      properties:
+        op:
+          type: string
+          const: DELETE_NODE
+        nodeId:
+          $ref: '#/components/schemas/Uuid'
+    AddEdgeOperation:
+      type: object
+      additionalProperties: false
+      required: [op, edge]
+      properties:
+        op:
+          type: string
+          const: ADD_EDGE
+        edge:
+          $ref: '#/components/schemas/EdgeInput'
+    UpdateEdgeOperation:
+      type: object
+      additionalProperties: false
+      required: [op, edgeId, changes]
+      properties:
+        op:
+          type: string
+          const: UPDATE_EDGE
+        edgeId:
+          $ref: '#/components/schemas/Uuid'
+        changes:
+          $ref: '#/components/schemas/EdgeChanges'
+    DeleteEdgeOperation:
+      type: object
+      additionalProperties: false
+      required: [op, edgeId]
+      properties:
+        op:
+          type: string
+          const: DELETE_EDGE
+        edgeId:
+          $ref: '#/components/schemas/Uuid'
+    CanvasOperation:
+      oneOf:
+        - $ref: '#/components/schemas/AddNodeOperation'
+        - $ref: '#/components/schemas/UpdateNodeOperation'
+        - $ref: '#/components/schemas/DeleteNodeOperation'
+        - $ref: '#/components/schemas/AddEdgeOperation'
+        - $ref: '#/components/schemas/UpdateEdgeOperation'
+        - $ref: '#/components/schemas/DeleteEdgeOperation'
+      discriminator:
+        propertyName: op
+        mapping:
+          ADD_NODE: '#/components/schemas/AddNodeOperation'
+          UPDATE_NODE: '#/components/schemas/UpdateNodeOperation'
+          DELETE_NODE: '#/components/schemas/DeleteNodeOperation'
+          ADD_EDGE: '#/components/schemas/AddEdgeOperation'
+          UPDATE_EDGE: '#/components/schemas/UpdateEdgeOperation'
+          DELETE_EDGE: '#/components/schemas/DeleteEdgeOperation'
+    CanvasSyncRequest:
+      type: object
+      additionalProperties: false
+      required: [baseVersion, operations]
+      properties:
+        baseVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: Applied in order, atomically.
+          items:
+            $ref: '#/components/schemas/CanvasOperation'
+
+    # ----------------------------------------------------------------- narrative
+    NarrativeInputType:
+      type: string
+      enum: [TEXT, VOICE]
+    TextNarrativeRequest:
+      type: object
+      additionalProperties: false
+      required: [inputType, text]
+      properties:
+        inputType:
+          type: string
+          const: TEXT
+        text:
+          type: string
+          minLength: 1
+          maxLength: 50000
+          pattern: '\S'
+        language:
+          $ref: '#/components/schemas/LanguageTag'
+    VoiceNarrativeRequest:
+      type: object
+      additionalProperties: false
+      required: [inputType, audio]
+      properties:
+        inputType:
+          type: string
+          const: VOICE
+        audio:
+          type: string
+          contentMediaType: audio/*
+          description: |
+            Recorded audio (binary part). Accepted media types and maximum
+            size/duration are server configuration; violations return `415`/`413`.
+        language:
+          $ref: '#/components/schemas/LanguageTag'
+    NarrativeProcessingResult:
+      type: object
+      additionalProperties: false
+      required: [narrativeId, inputType, generatedNodeIds, generatedEdgeIds, canvas]
+      properties:
+        narrativeId:
+          $ref: '#/components/schemas/Uuid'
+        inputType:
+          $ref: '#/components/schemas/NarrativeInputType'
+        transcript:
+          type: string
+          description: Speech-to-text result. Present only for VOICE so the lawyer can verify what was understood.
+        generatedNodeIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Uuid'
+          description: Nodes added by this narrative (lets the UI highlight them).
+        generatedEdgeIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/Uuid'
+        canvas:
+          $ref: '#/components/schemas/CanvasSnapshot'
+      if:
+        properties:
+          inputType:
+            const: VOICE
+      then:
+        required: [transcript]
+      else:
+        not:
+          required: [transcript]
+
+    # --------------------------------------------------------------------- audit
+    AlertSeverity:
+      type: string
+      enum: [HIGH, MEDIUM, LOW]
+      description: |
+        HIGH: may defeat the claim/defence if unaddressed.
+        MEDIUM: weakens the case theory.
+        LOW: improvement suggestion.
+    AlertType:
+      type: string
+      enum:
+        - PROCEDURAL_GAP
+        - LOGICAL_CONTRADICTION
+        - EVIDENCE_CONFLICT
+        - UNSUPPORTED_FACT
+        - MISSING_LEGAL_BASIS
+        - CASE_THEORY_WEAKNESS
+        - STRUCTURAL_ISSUE
+      description: |
+        PROCEDURAL_GAP: missing procedural requirement or step.
+        LOGICAL_CONTRADICTION: incompatible facts/claims.
+        EVIDENCE_CONFLICT: evidence contradicts an asserted fact.
+        UNSUPPORTED_FACT: fact without supporting evidence.
+        MISSING_LEGAL_BASIS: fact without applicable norm or precedent.
+        CASE_THEORY_WEAKNESS: argumentative weakness not covered above.
+        STRUCTURAL_ISSUE: graph problems (isolated nodes, atypical relationship pairs).
+    AuditRequest:
+      type: object
+      additionalProperties: false
+      required: [canvasVersion]
+      properties:
+        canvasVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        alertTypes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: Optional focus. When omitted, all alert types are evaluated.
+          items:
+            $ref: '#/components/schemas/AlertType'
+    AuditAlert:
+      type: object
+      additionalProperties: false
+      required: [id, severity, type, title, description, relatedNodeIds, relatedEdgeIds]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        severity:
+          $ref: '#/components/schemas/AlertSeverity'
+        type:
+          $ref: '#/components/schemas/AlertType'
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4000
+        recommendation:
+          type: string
+          maxLength: 2000
+          description: Suggested corrective action, when one can be proposed.
+        relatedNodeIds:
+          type: array
+          description: Nodes involved. May be empty for gaps (something missing).
+          items:
+            $ref: '#/components/schemas/Uuid'
+        relatedEdgeIds:
+          type: array
+          description: Edges involved (e.g. a CONTRADICTS relationship). May be empty.
+          items:
+            $ref: '#/components/schemas/Uuid'
+    AuditReport:
+      type: object
+      additionalProperties: false
+      required: [auditId, caseId, canvasVersion, generatedAt, alerts]
+      properties:
+        auditId:
+          $ref: '#/components/schemas/Uuid'
+        caseId:
+          $ref: '#/components/schemas/Uuid'
+        canvasVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        generatedAt:
+          $ref: '#/components/schemas/Timestamp'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditAlert'
+
+    # ----------------------------------------------------------------- documents
+    DocumentType:
+      type: string
+      enum: [LEGAL_BRIEF, CLOSING_ARGUMENT, LEGAL_OPINION]
+    DocumentStatus:
+      type: string
+      enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+    DocumentFormat:
+      type: string
+      enum: [MARKDOWN]
+      description: Content representation. Enum allows future formats without breaking the schema shape.
+    DocumentGenerationRequest:
+      type: object
+      additionalProperties: false
+      required: [documentType, canvasVersion]
+      properties:
+        documentType:
+          $ref: '#/components/schemas/DocumentType'
+        canvasVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        instructions:
+          type: string
+          maxLength: 4000
+          description: Optional lawyer guidance (tone, emphasis, points to develop).
+        language:
+          $ref: '#/components/schemas/LanguageTag'
+    DocumentMetadata:
+      type: object
+      additionalProperties: false
+      required: [caseId, documentType, title, language, sourceCanvasVersion]
+      properties:
+        caseId:
+          $ref: '#/components/schemas/Uuid'
+        documentType:
+          $ref: '#/components/schemas/DocumentType'
+        title:
+          type: string
+          maxLength: 300
+        language:
+          $ref: '#/components/schemas/LanguageTag'
+        sourceCanvasVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        instructions:
+          type: string
+          maxLength: 4000
+          description: Instructions supplied at request time (traceability).
+    DocumentGenerationFailure:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+        message:
+          type: string
+    DocumentGeneration:
+      type: object
+      additionalProperties: false
+      required: [status, requestedAt]
+      properties:
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        requestedAt:
+          $ref: '#/components/schemas/Timestamp'
+        completedAt:
+          $ref: '#/components/schemas/Timestamp'
+        failure:
+          $ref: '#/components/schemas/DocumentGenerationFailure'
+      allOf:
+        - if:
+            properties:
+              status:
+                enum: [COMPLETED, FAILED]
+          then:
+            required: [completedAt]
+        - if:
+            properties:
+              status:
+                const: FAILED
+          then:
+            required: [failure]
+          else:
+            not:
+              required: [failure]
+    DocumentContent:
+      type: object
+      additionalProperties: false
+      required: [format, body]
+      properties:
+        format:
+          $ref: '#/components/schemas/DocumentFormat'
+        body:
+          type: string
+          description: AI-generated draft. Requires professional review before use.
+    DocumentSummary:
+      type: object
+      additionalProperties: false
+      required: [id, metadata, generation]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        metadata:
+          $ref: '#/components/schemas/DocumentMetadata'
+        generation:
+          $ref: '#/components/schemas/DocumentGeneration'
+    Document:
+      type: object
+      additionalProperties: false
+      required: [id, metadata, generation]
+      description: '`content` is present if and only if `generation.status` is `COMPLETED`.'
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        metadata:
+          $ref: '#/components/schemas/DocumentMetadata'
+        generation:
+          $ref: '#/components/schemas/DocumentGeneration'
+        content:
+          $ref: '#/components/schemas/DocumentContent'
+      if:
+        properties:
+          generation:
+            properties:
+              status:
+                const: COMPLETED
+      then:
+        required: [content]
+      else:
+        not:
+          required: [content]
+    DocumentList:
+      type: object
+      additionalProperties: false
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+
+    # -------------------------------------------------------------------- errors
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [pointer, code, message]
+      properties:
+        pointer:
+          type: string
+          description: JSON Pointer (RFC 6901) to the offending request field.
+          examples:
+            - /operations/1/edge/target
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+        message:
+          type: string
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, traceId, retryable]
+      properties:
+        code:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          description: Stable, machine-readable error code (see error catalog). Clients branch on this.
+        message:
+          type: string
+          description: Human-readable, safe-to-display message. Never contains internal details.
+        traceId:
+          type: string
+          maxLength: 64
+          description: Correlation id for support and log lookup.
+        retryable:
+          type: boolean
+          description: Whether repeating the same request (same Idempotency-Key) may succeed.
+        details:
+          type: object
+          description: Code-specific structured context (e.g. maxBytes, supportedMediaTypes, operationIndex).
+        fieldErrors:
+          type: array
+          description: Per-field validation problems (400/422 only).
+          items:
+            $ref: '#/components/schemas/FieldError'
+    CanvasVersionConflictDetails:
+      type: object
+      additionalProperties: false
+      required: [clientVersion, currentVersion, serverCanvas]
+      properties:
+        clientVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        currentVersion:
+          $ref: '#/components/schemas/CanvasVersion'
+        serverCanvas:
+          $ref: '#/components/schemas/CanvasSnapshot'
+    CanvasVersionConflictError:
+      type: object
+      additionalProperties: false
+      required: [code, message, traceId, retryable, details]
+      description: Error returned when `baseVersion`/`canvasVersion` is stale. Includes the server state to rebase on.
+      properties:
+        code:
+          type: string
+          const: CANVAS_VERSION_CONFLICT
+        message:
+          type: string
+        traceId:
+          type: string
+          maxLength: 64
+        retryable:
+          type: boolean
+          const: false
+        details:
+          $ref: '#/components/schemas/CanvasVersionConflictDetails'
