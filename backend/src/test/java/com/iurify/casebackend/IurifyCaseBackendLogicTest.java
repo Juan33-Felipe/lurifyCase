@@ -2,6 +2,7 @@ package com.iurify.casebackend;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iurify.casebackend.application.exception.CanvasVersionConflictException;
+import com.iurify.casebackend.application.exception.EmailAlreadyExistsException;
 import com.iurify.casebackend.application.port.IAClient;
 import com.iurify.casebackend.application.port.SpeechToTextService;
 import com.iurify.casebackend.application.service.*;
@@ -304,5 +305,56 @@ class IurifyCaseBackendLogicTest {
                 documentGeneratorService.exportDocument(createdCase.getId(), generatedDoc.getId(), "WORD");
         assertEquals("application/vnd.openxmlformats-officedocument.wordprocessingml.document", wordExport.contentType());
         assertTrue(wordExport.bytes().length > 50);
+    }
+
+    @Test
+    void shouldRegisterNewUserSuccessfullyAndAuthenticate() {
+        String fullName = "Carlos Santander, Esq.";
+        String email = "carlos.santander@lawfirm.example";
+        String password = "SecurePassword2026!";
+
+        User registered = authService.register(fullName, email, password);
+
+        assertNotNull(registered.getId());
+        assertEquals("carlos.santander@lawfirm.example", registered.getEmail());
+        assertEquals(fullName, registered.getFullName());
+        assertEquals("EMAIL", registered.getAuthMethod());
+        assertNotNull(registered.getPasswordHash());
+        assertNotNull(registered.getCreatedAt());
+
+        // Verify newly registered user can be authenticated with original password
+        User authenticated = authService.authenticate(email, password, null, null);
+        assertEquals(registered.getId(), authenticated.getId());
+
+        // Verify signed JWT token generation with 86400s
+        String token = jwtService.generateToken(registered, 86400L);
+        assertNotNull(token);
+        AuthenticatedUser principal = jwtService.parseAndValidate(token);
+        assertEquals(registered.getId(), principal.id());
+        assertEquals(registered.getEmail(), principal.email());
+    }
+
+    @Test
+    void shouldThrowConflictExceptionWhenRegisteringExistingEmail() {
+        // demo.lawyer@example.com already exists in the repository
+        EmailAlreadyExistsException ex = assertThrows(EmailAlreadyExistsException.class, () ->
+                authService.register("Clone Lawyer", "demo.lawyer@example.com", "anyPassword123")
+        );
+
+        assertEquals("Email already registered", ex.getMessage());
+        assertEquals("EMAIL_ALREADY_REGISTERED", ex.getCode());
+    }
+
+    @Test
+    void shouldValidateRegistrationParameters() {
+        assertThrows(IllegalArgumentException.class, () ->
+                authService.register(null, "valid@example.com", "pass123")
+        );
+        assertThrows(IllegalArgumentException.class, () ->
+                authService.register("Valid Name", null, "pass123")
+        );
+        assertThrows(IllegalArgumentException.class, () ->
+                authService.register("Valid Name", "valid@example.com", "")
+        );
     }
 }

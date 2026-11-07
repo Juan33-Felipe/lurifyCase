@@ -32,6 +32,14 @@ public class SpringDataJpaUserRepository implements UserRepository {
     }
 
     @Override
+    public boolean existsByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return jpaRepository.existsByEmailIgnoreCase(email.trim());
+    }
+
+    @Override
     public User save(User user) {
         UserEntity entity = toEntity(user);
         UserEntity saved = jpaRepository.save(entity);

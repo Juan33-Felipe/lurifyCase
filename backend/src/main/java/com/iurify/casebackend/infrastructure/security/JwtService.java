@@ -42,8 +42,12 @@ public class JwtService {
     }
 
     public String generateToken(User user) {
+        return generateToken(user, this.expirationSeconds);
+    }
+
+    public String generateToken(User user, long customExpirationSeconds) {
         Instant now = Instant.now();
-        Instant expiry = now.plusSeconds(expirationSeconds);
+        Instant expiry = now.plusSeconds(customExpirationSeconds);
 
         return Jwts.builder()
                 .subject(user.getId().toString())

@@ -2,7 +2,9 @@ package com.iurify.casebackend.infrastructure.controller;
 
 import com.iurify.casebackend.application.exception.AuthenticationFailedException;
 import com.iurify.casebackend.application.exception.CanvasVersionConflictException;
+import com.iurify.casebackend.application.exception.ConflictException;
 import com.iurify.casebackend.application.exception.DocumentConflictException;
+import com.iurify.casebackend.application.exception.EmailAlreadyExistsException;
 import com.iurify.casebackend.application.exception.ResourceNotFoundException;
 import com.iurify.casebackend.application.exception.UnprocessableEntityException;
 import com.iurify.casebackend.infrastructure.controller.dto.CanvasConflictErrorDto;
@@ -71,6 +73,36 @@ public class GlobalExceptionHandler {
                 snapshotDto
         );
         return new ResponseEntity<>(conflictError, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<ErrorDto> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
+        ErrorDto error = new ErrorDto(
+                "https://api.iurify.com/errors/conflict",
+                "Email Conflict",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                ex.getCode() != null ? ex.getCode() : "EMAIL_ALREADY_REGISTERED",
+                ex.getMessage(),
+                generateTraceId(),
+                false
+        );
+        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorDto> handleConflictException(ConflictException ex) {
+        ErrorDto error = new ErrorDto(
+                "https://api.iurify.com/errors/conflict",
+                "Conflict",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                ex.getCode() != null ? ex.getCode() : "CONFLICT",
+                ex.getMessage(),
+                generateTraceId(),
+                false
+        );
+        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(DocumentConflictException.class)
