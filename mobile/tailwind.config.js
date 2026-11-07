@@ -1,0 +1,70 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: "class",
+  content: [
+    "./App.{js,jsx,ts,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}"
+  ],
+  presets: [require("nativewind/preset")],
+  theme: {
+    extend: {
+      colors: {
+        // Editorial High-Contrast Tokens (Plan Part 1 & Part 2)
+        "alabaster": "#F8F9FB",
+        "alabaster-pure": "#FAFAFA",
+        "charcoal": "#1E1E20",
+        "charcoal-card": "#242426",
+        "charcoal-elevated": "#2C2C30",
+        "lavender-ice": "#F1F4FB",
+        "lavender-border": "#E3E8F4",
+        "cool-gray": "#8E8E93",
+        "muted-silver": "#A1A1AA",
+        "ink": "#1E1E20",
+        "surface-white": "#FFFFFF",
+        "dark-bg": "#121214",
+        "dark-surface": "#1C1C1F",
+        "dark-secondary": "#262830",
+        "accent-blue": "#3B6EF6",
+        "status-high": "#E5484D",
+        "status-medium": "#F5A623",
+        "status-low": "#2E9F6E",
+      },
+      borderRadius: {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "2xl": "1rem",
+        "3xl": "1.5rem",
+        "card": "1.75rem",
+        "hero": "2rem",
+        "full": "9999px",
+      },
+      fontFamily: {
+        "sans": ["Outfit_400Regular"],
+        "sans-medium": ["Outfit_500Medium"],
+        "sans-semibold": ["Outfit_600SemiBold"],
+        "sans-bold": ["Outfit_700Bold"],
+        "sans-extrabold": ["Outfit_800ExtraBold"],
+        // Legacy aliases mapped to Circular Geometric Sans-Serif
+        "body-sm": ["Outfit_400Regular"],
+        "body-md": ["Outfit_400Regular"],
+        "body-lg": ["Outfit_400Regular"],
+        "label-sm": ["Outfit_500Medium"],
+        "label-md": ["Outfit_500Medium"],
+        "label-lg": ["Outfit_600SemiBold"],
+        "headline-sm": ["Outfit_600SemiBold"],
+        "headline-md": ["Outfit_700Bold"],
+        "headline-lg": ["Outfit_700Bold"],
+        "headline-xl": ["Outfit_800ExtraBold"],
+      },
+      fontSize: {
+        "hero": ["26px", { lineHeight: "33px", letterSpacing: "-0.02em" }],
+        "section": ["19px", { lineHeight: "25px", letterSpacing: "-0.01em" }],
+        "card-title": ["17px", { lineHeight: "22px", letterSpacing: "-0.01em" }],
+        "body": ["13.5px", { lineHeight: "19px" }],
+        "meta": ["12px", { lineHeight: "16px" }],
+      },
+    },
+  },
+  plugins: [],
+};
