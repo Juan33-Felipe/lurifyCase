@@ -20,7 +20,8 @@ if (!env.EXPO_PUBLIC_API_URL) {
 }
 console.log(`API de la app: ${env.EXPO_PUBLIC_API_URL}`);
 
-const child = spawn('npx', ['expo', 'start', ...process.argv.slice(2)], {
+const args = process.argv.slice(2).join(' ');
+const child = spawn(`npx expo start ${args}`.trim(), {
   cwd: new URL('../mobile/', import.meta.url),
   env,
   stdio: 'inherit',
