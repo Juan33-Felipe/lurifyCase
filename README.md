@@ -32,22 +32,42 @@ Este repositorio es un monorepo con el backend y la app móvil.
 
 ## Arrancar
 
-### Backend
+Requisitos: Node 20+, Java 17, Maven y Docker Desktop.
+
+La primera vez, instala las dependencias:
 
 ```bash
-cd backend
-cp .env.example .env      # completar variables
-docker compose up -d      # PostgreSQL con schema.sql y seed.sql
-mvn spring-boot:run
+npm run setup
 ```
 
-### Mobile
+Después, un solo comando levanta todo:
 
 ```bash
-cd mobile
-npm install
-npm start                 # expo start
+npm run dev
 ```
+
+Eso hace lo siguiente:
+
+1. Abre Docker Desktop si está apagado y levanta PostgreSQL con el esquema y los datos semilla.
+2. Arranca el backend en `http://localhost:8080`.
+3. Arranca Expo en `http://localhost:8081`. Desde ahí se abre la app en web (tecla `w`), en el emulador de Android (`a`) o en el teléfono con Expo Go escaneando el QR.
+
+La app apunta al backend por la IP de tu red local, así que también funciona desde un teléfono conectado al mismo wifi. Para usar otra URL, define `EXPO_PUBLIC_API_URL` antes de ejecutar el comando.
+
+`Ctrl+C` detiene el backend y la app. La base de datos sigue corriendo. Para apagarla:
+
+```bash
+npm run db:down
+```
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Base de datos + backend + app |
+| `npm run dev:api` | Solo el backend |
+| `npm run dev:app` | Solo la app |
+| `npm run db:up` / `npm run db:down` | Levanta o apaga PostgreSQL |
+
+Usuario de prueba: `demo.lawyer@example.com` / `password123`.
 
 ## Documentación
 
