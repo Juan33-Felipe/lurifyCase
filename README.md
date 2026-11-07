@@ -34,11 +34,23 @@ Este repositorio es un monorepo con el backend y la app móvil.
 
 Requisitos: Node 20+, Java 17 y Docker Desktop. No hace falta instalar Maven: el backend trae el Maven Wrapper (`mvnw`).
 
-La primera vez, instala las dependencias:
+La primera vez, instala las dependencias y crea el archivo de configuración del backend:
 
 ```bash
 npm run setup
+cp backend/.env.example backend/.env
 ```
+
+### Base de datos
+
+El backend lee la conexión de `backend/.env`. Ese archivo no se sube a git.
+
+- **Local con Docker (por defecto):** deja `DB_URL` apuntando a `localhost`. `npm run dev` levanta PostgreSQL en Docker con el esquema y los datos semilla.
+- **Neon:** pon en `DB_URL`, `DB_USERNAME` y `DB_PASSWORD` los datos del proyecto `lurifyCase` de Neon. La URL va en formato JDBC, por ejemplo `jdbc:postgresql://<host>-pooler.<región>.aws.neon.tech/neondb?sslmode=require&channelBinding=require`. Con una base remota, `npm run dev` no arranca Docker.
+
+Pide los datos de Neon a quien administre el proyecto. Nunca los subas al repositorio.
+
+### Comando de desarrollo
 
 Después, un solo comando levanta todo:
 
@@ -48,7 +60,7 @@ npm run dev
 
 Eso hace lo siguiente:
 
-1. Abre Docker Desktop si está apagado y levanta PostgreSQL con el esquema y los datos semilla.
+1. Si la base de datos es local, abre Docker Desktop si está apagado y levanta PostgreSQL. Si es Neon, se salta este paso.
 2. Arranca el backend en `http://localhost:8080`.
 3. Arranca Expo en `http://localhost:8081`. Desde ahí se abre la app en web (tecla `w`), en el emulador de Android (`a`) o en el teléfono con Expo Go escaneando el QR.
 
