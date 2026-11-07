@@ -8,9 +8,12 @@
     "dev:api": "node scripts/start-backend.mjs",
     "dev:app": "node scripts/start-mobile.mjs",
     "db:up": "node scripts/ensure-docker.mjs && docker compose -f backend/docker-compose.yml up -d --wait",
-    "db:down": "docker compose -f backend/docker-compose.yml down"
+    "db:down": "docker compose -f backend/docker-compose.yml down",
+    "neon": "neonctl --profile juan",
+    "neon:login": "neonctl login --profile juan"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "neonctl": "^9.2.0"
   }
 }
