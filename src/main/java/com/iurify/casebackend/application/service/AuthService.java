@@ -1,12 +1,16 @@
 package com.iurify.casebackend.application.service;
 
 import com.iurify.casebackend.application.exception.AuthenticationFailedException;
+import com.iurify.casebackend.application.exception.EmailAlreadyExistsException;
 import com.iurify.casebackend.domain.model.User;
 import com.iurify.casebackend.domain.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -69,5 +73,35 @@ public class AuthService {
         }
 
         return user;
+    }
+
+    @Transactional
+    public User register(String fullName, String email, String password) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email is required.");
+        }
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Password is required.");
+        }
+        if (fullName == null || fullName.isBlank()) {
+            throw new IllegalArgumentException("Full name is required.");
+        }
+
+        String normalizedEmail = email.trim();
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new EmailAlreadyExistsException("Email already registered");
+        }
+
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail(normalizedEmail);
+        user.setFullName(fullName.trim());
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setAuthMethod("EMAIL");
+        Instant now = Instant.now();
+        user.setCreatedAt(now);
+        user.setUpdatedAt(now);
+
+        return userRepository.save(user);
     }
 }

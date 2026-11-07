@@ -9,4 +9,11 @@ public interface UserRepository {
     Optional<User> findByEmail(String email);
     Optional<User> findById(UUID id);
     User save(User user);
+
+    default boolean existsByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return findByEmail(email.trim()).isPresent();
+    }
 }

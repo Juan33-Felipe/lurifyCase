@@ -53,6 +53,47 @@ paths:
   # ---------------------------------------------------------------------------
   # AUTHENTICATION
   # ---------------------------------------------------------------------------
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      operationId: register
+      summary: Register a new lawyer account and obtain an access token
+      description: |
+        Public endpoint. Registers a new lawyer user and returns a signed JWT access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              fullName: Jane Doe, Esq.
+              email: lawyer@example.com
+              password: correct-horse-battery-staple
+      responses:
+        '201':
+          description: User registered successfully.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/auth/login:
     post:
       tags: [Authentication]
@@ -834,6 +875,24 @@ components:
           description: Present only when `hasMore` is true.
 
     # ------------------------------------------------------------ authentication
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [fullName, email, password]
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
     LoginRequest:
       type: object
       additionalProperties: false

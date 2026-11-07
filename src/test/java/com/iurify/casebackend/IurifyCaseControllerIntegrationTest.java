@@ -304,4 +304,75 @@ class IurifyCaseControllerIntegrationTest {
                 .andReturn();
         assertTrue(wordExport.getResponse().getContentAsByteArray().length > 50);
     }
+
+    @Test
+    void shouldRegisterNewUserAndReturn201WithAuthTokenResponse() throws Exception {
+        String registrationPayload = """
+                {
+                    "fullName": "Harvey Specter, Esq.",
+                    "email": "harvey.specter@pearsonhardman.example",
+                    "password": "CloserPassword2026!"
+                }
+                """;
+
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationPayload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(86400))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.user.fullName").value("Harvey Specter, Esq."))
+                .andExpect(jsonPath("$.user.email").value("harvey.specter@pearsonhardman.example"))
+                .andExpect(jsonPath("$.user.id").isNotEmpty())
+                .andReturn();
+
+        JsonNode responseJson = objectMapper.readTree(result.getResponse().getContentAsString());
+        String newAccessToken = responseJson.get("accessToken").asText();
+
+        // Ensure the returned JWT can authenticate requests against protected endpoints
+        mockMvc.perform(post("/api/v1/cases")
+                        .header("Authorization", "Bearer " + newAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Pearson Litigation v. Coastal\",\"description\":\"Contract breach\",\"jurisdiction\":\"New York District\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Pearson Litigation v. Coastal"));
+    }
+
+    @Test
+    void shouldReturn409ConflictWhenRegisteringDuplicateEmail() throws Exception {
+        String duplicatePayload = """
+                {
+                    "fullName": "Imposter Lawyer",
+                    "email": "demo.lawyer@example.com",
+                    "password": "Password123!"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(duplicatePayload))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.title").value("Email Conflict"))
+                .andExpect(jsonPath("$.detail").value("Email already registered"))
+                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_REGISTERED"))
+                .andExpect(jsonPath("$.type").value("https://api.iurify.com/errors/conflict"));
+    }
+
+    @Test
+    void shouldReturn400BadRequestWhenRegisteringWithMissingFields() throws Exception {
+        String invalidPayload = """
+                {
+                    "fullName": "",
+                    "email": "not-an-email",
+                    "password": ""
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidPayload))
+                .andExpect(status().isBadRequest());
+    }
 }

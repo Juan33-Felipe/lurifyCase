@@ -22,3 +22,10 @@ target/
 *.iml
 .DS_Store
 Thumbs.db
+backend.log
+proxy.log
+node_modules/
+package.json
+package-lock.json
+proxy.js
+
