@@ -11,6 +11,8 @@ import com.iurify.casebackend.infrastructure.controller.dto.CanvasConflictErrorD
 import com.iurify.casebackend.infrastructure.controller.dto.CanvasSnapshotDto;
 import com.iurify.casebackend.infrastructure.controller.dto.ErrorDto;
 import com.iurify.casebackend.infrastructure.controller.mapper.DtoMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -24,6 +26,9 @@ import java.util.UUID;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String GENERIC_ERROR = "An unexpected error occurred.";
 
     private final DtoMapper dtoMapper;
 
@@ -170,16 +175,23 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
     }
 
+    /**
+     * Errores no previstos: el cliente solo recibe un mensaje genérico y el traceId.
+     * El detalle (mensaje y stack trace) queda en el log del backend con ese mismo traceId,
+     * para no exponer clases internas, ids ni datos de la base a la app.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDto> handleGenericException(Exception ex) {
+        String traceId = generateTraceId();
+        log.error("Unexpected error [traceId={}]", traceId, ex);
         ErrorDto error = new ErrorDto(
                 "https://api.iurify.com/errors/internal-server-error",
                 "Internal Server Error",
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred.",
+                GENERIC_ERROR,
                 "INTERNAL_SERVER_ERROR",
-                ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred.",
-                generateTraceId(),
+                GENERIC_ERROR,
+                traceId,
                 true
         );
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
