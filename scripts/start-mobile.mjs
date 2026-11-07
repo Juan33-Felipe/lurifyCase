@@ -3,6 +3,8 @@
 // Si EXPO_PUBLIC_API_URL ya está definida, se respeta.
 import { spawn } from 'node:child_process';
 import { networkInterfaces } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 const lanIp = () => {
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
@@ -20,11 +22,12 @@ if (!env.EXPO_PUBLIC_API_URL) {
 }
 console.log(`API de la app: ${env.EXPO_PUBLIC_API_URL}`);
 
-const args = process.argv.slice(2).join(' ');
-const child = spawn(`npx expo start ${args}`.trim(), {
-  cwd: new URL('../mobile/', import.meta.url),
+// Se llama al CLI de Expo con Node directamente, sin npx, para no heredar avisos de npm/pnpm.
+const mobile = fileURLToPath(new URL('../mobile/', import.meta.url));
+const cli = join(mobile, 'node_modules', 'expo', 'bin', 'cli');
+const child = spawn(process.execPath, [cli, 'start', ...process.argv.slice(2)], {
+  cwd: mobile,
   env,
   stdio: 'inherit',
-  shell: true,
 });
 child.on('exit', (code) => process.exit(code ?? 0));
