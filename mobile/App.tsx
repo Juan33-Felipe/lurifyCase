@@ -11,6 +11,12 @@ import {
   Outfit_700Bold,
   Outfit_800ExtraBold,
 } from '@expo-google-fonts/outfit';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 
 import './global.css';
 import { SettingsProvider, useSettings } from './src/context/SettingsContext';
@@ -49,12 +55,13 @@ function Shell() {
     );
   }
 
-  if (status === 'signedOut' || status === 'locked') {
+  if (status === 'signedOut') {
+    // El login tiene su propio fondo y por ahora siempre es claro.
     return (
-      <GlassBackground>
-        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+      <>
+        <StatusBar style="dark" />
         <LoginScreen />
-      </GlassBackground>
+      </>
     );
   }
 
@@ -92,6 +99,10 @@ function Root() {
     Outfit_600SemiBold,
     Outfit_700Bold,
     Outfit_800ExtraBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
   const { hydrated } = useSettings();
 

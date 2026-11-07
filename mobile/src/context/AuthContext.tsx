@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { authService } from '../services/authService';
 import { sessionStorage, StoredSession } from '../services/sessionStorage';
@@ -6,8 +6,8 @@ import { setAccessToken, setUnauthorizedHandler } from '../services/apiClient';
 import { UserProfile } from '../types/api.types';
 import { useSettings } from './SettingsContext';
 
-/** loading: restoring session · locked: session exists, biometrics required · signedOut · signedIn */
-export type AuthStatus = 'loading' | 'locked' | 'signedOut' | 'signedIn';
+/** loading: restoring session · signedOut · signedIn */
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -15,8 +15,6 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (fullName: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  /** Prompts biometrics; on success promotes a locked session to signed-in. */
-  unlockWithBiometrics: (promptMessage: string) => Promise<boolean>;
   biometricsAvailable: () => Promise<boolean>;
   confirmBiometrics: (promptMessage: string) => Promise<boolean>;
 }
@@ -24,10 +22,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { hydrated, biometricEnabled } = useSettings();
+  const { hydrated } = useSettings();
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<UserProfile | null>(null);
-  const pending = useRef<StoredSession | null>(null);
 
   const activate = useCallback((session: StoredSession) => {
     setAccessToken(session.accessToken);
@@ -36,14 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    pending.current = null;
     setAccessToken(null);
     setUser(null);
     setStatus('signedOut');
     await sessionStorage.clear();
   }, []);
 
-  // Restore a stored session once settings (biometric flag) are known.
+  // Restore a stored session once settings are hydrated. The login screen has no biometric lock.
   useEffect(() => {
     if (!hydrated) return;
     let active = true;
@@ -51,10 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
       if (!session) {
         setStatus('signedOut');
-      } else if (biometricEnabled) {
-        pending.current = session;
-        setUser(session.user);
-        setStatus('locked');
       } else {
         activate(session);
       }
@@ -118,22 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return result.success;
   }, []);
 
-  const unlockWithBiometrics = useCallback(
-    async (promptMessage: string) => {
-      const ok = await confirmBiometrics(promptMessage);
-      if (ok && pending.current) {
-        const session = pending.current;
-        pending.current = null;
-        activate(session);
-      }
-      return ok;
-    },
-    [activate, confirmBiometrics]
-  );
-
   const value = useMemo(
-    () => ({ status, user, signIn, signUp, signOut, unlockWithBiometrics, biometricsAvailable, confirmBiometrics }),
-    [status, user, signIn, signUp, signOut, unlockWithBiometrics, biometricsAvailable, confirmBiometrics]
+    () => ({ status, user, signIn, signUp, signOut, biometricsAvailable, confirmBiometrics }),
+    [status, user, signIn, signUp, signOut, biometricsAvailable, confirmBiometrics]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
