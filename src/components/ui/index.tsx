@@ -188,7 +188,10 @@ export function GlassButton({
   );
 }
 
-export function GlassInput(props: TextInputProps & { icon?: IconName }) {
+export const GlassInput = React.forwardRef<
+  React.ElementRef<typeof TextInput>,
+  TextInputProps & { icon?: IconName }
+>(function GlassInput(props, ref) {
   const palette = useTheme();
   const { icon, style, ...rest } = props;
   return (
@@ -207,6 +210,7 @@ export function GlassInput(props: TextInputProps & { icon?: IconName }) {
         <Icon name={icon} size={20} color={palette.textMuted} style={{ marginRight: 10 }} />
       ) : null}
       <TextInput
+        ref={ref}
         placeholderTextColor={palette.textMuted}
         style={[
           {
@@ -222,7 +226,7 @@ export function GlassInput(props: TextInputProps & { icon?: IconName }) {
       />
     </View>
   );
-}
+});
 
 export function Reveal({
   index = 0,
