@@ -13,8 +13,11 @@ const dockerUp = () => {
 
 if (dockerUp()) process.exit(0);
 
-const desktop = 'C:\Program Files\Docker\Docker\Docker Desktop.exe';
-if (process.platform === 'win32' && existsSync(desktop)) {
+const desktop = [
+  'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
+  `${process.env.LOCALAPPDATA}\\Programs\\DockerDesktop\\Docker Desktop.exe`,
+].find((p) => p && existsSync(p));
+if (process.platform === 'win32' && desktop) {
   console.log('Docker no está corriendo. Abriendo Docker Desktop...');
   spawn(desktop, [], { detached: true, stdio: 'ignore' }).unref();
 } else {
