@@ -1,14 +1,20 @@
-// Arranca el backend con el Maven Wrapper del repo, así no hace falta tener Maven instalado.
+// Arranca el backend con el jar empaquetado si existe, o con el Maven Wrapper del repo.
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
-// Ruta absoluta: Windows puede tener desactivada la búsqueda de ejecutables en la carpeta actual.
 const backend = fileURLToPath(new URL('../backend/', import.meta.url));
+const jarPath = join(backend, 'target', 'iurifycase-backend-0.0.1-SNAPSHOT.jar');
 const mvnw = join(backend, process.platform === 'win32' ? 'mvnw.cmd' : 'mvnw');
-const child = spawn(`"${mvnw}" -q spring-boot:run`, {
+
+const cmd = existsSync(jarPath)
+  ? `java -jar "${jarPath}"`
+  : `"${mvnw}" -q spring-boot:run`;
+
+const child = spawn(cmd, {
   cwd: backend,
-  stdio: 'inherit',
+  stdio: ['ignore', 'inherit', 'inherit'],
   shell: true,
 });
 child.on('exit', (code) => process.exit(code ?? 0));
