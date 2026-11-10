@@ -6,9 +6,11 @@ import {
   Case,
   CanvasSnapshot,
   CaseDeadline,
+  CaseNarrativeEntry,
   CreateCaseRequest,
   DeadlinePriority,
 } from '../types/api.types';
+import { mockNarrativeEntries } from '../domain/mockData';
 import { useSettings } from './SettingsContext';
 import { useAuth } from './AuthContext';
 import {
@@ -19,6 +21,7 @@ import {
 } from '../services/caseTranslationService';
 
 const DEADLINES_STORAGE_KEY = '@iurifycase/deadlines_v1';
+const NARRATIVES_STORAGE_KEY = '@iurifycase/narratives_v2';
 
 interface Remote<T> {
   data: T | null;
@@ -33,6 +36,8 @@ export interface AddDeadlineInput {
   to: string;
   priority?: DeadlinePriority;
 }
+
+export type AddNarrativeInput = Omit<CaseNarrativeEntry, 'id' | 'timestamp'>;
 
 interface CasesContextValue {
   cases: Remote<Case[]>;
@@ -49,6 +54,8 @@ interface CasesContextValue {
   addDeadline: (input: AddDeadlineInput) => Promise<CaseDeadline | null>;
   toggleDeadline: (deadlineId: string) => Promise<void>;
   removeDeadline: (deadlineId: string) => Promise<void>;
+  narratives: CaseNarrativeEntry[];
+  addNarrativeEntry: (input: AddNarrativeInput) => Promise<CaseNarrativeEntry>;
 }
 
 const CasesContext = createContext<CasesContextValue | null>(null);
@@ -70,8 +77,9 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   const [reloadTick, setReloadTick] = useState(0);
   const [auditState, setAuditState] = useState<{ caseId: string; report: AuditReport | null; loading: boolean; error: boolean } | null>(null);
   const [allDeadlines, setAllDeadlines] = useState<CaseDeadline[]>([]);
+  const [allNarratives, setAllNarratives] = useState<Record<string, CaseNarrativeEntry[]>>(mockNarrativeEntries);
 
-  // Load persisted deadlines on mount
+  // Load persisted deadlines and narratives on mount
   useEffect(() => {
     let active = true;
     AsyncStorage.getItem(DEADLINES_STORAGE_KEY)
@@ -87,6 +95,21 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {});
+
+    AsyncStorage.getItem(NARRATIVES_STORAGE_KEY)
+      .then((raw) => {
+        if (!active || !raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            setAllNarratives((prev) => ({ ...mockNarrativeEntries, ...parsed }));
+          }
+        } catch {
+          // ignore malformed storage
+        }
+      })
+      .catch(() => {});
+
     return () => {
       active = false;
     };
@@ -100,6 +123,43 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
       // ignore storage errors
     }
   }, []);
+
+  const persistNarratives = useCallback(
+    async (next: Record<string, CaseNarrativeEntry[]>) => {
+      setAllNarratives(next);
+      try {
+        await AsyncStorage.setItem(NARRATIVES_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+    },
+    []
+  );
+
+  const addNarrativeEntry = useCallback(
+    async (input: AddNarrativeInput): Promise<CaseNarrativeEntry> => {
+      const entry: CaseNarrativeEntry = {
+        ...input,
+        id: `narrative-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+      };
+      const caseId = input.caseId;
+      setAllNarratives((prev) => {
+        const currentList = prev[caseId] || [];
+        const nextList = [entry, ...currentList];
+        const nextMap = { ...prev, [caseId]: nextList };
+        persistNarratives(nextMap);
+        return nextMap;
+      });
+      return entry;
+    },
+    [persistNarratives]
+  );
+
+  const selectedNarratives = useMemo(() => {
+    if (!selectedId) return [];
+    return allNarratives[selectedId] || [];
+  }, [allNarratives, selectedId]);
 
   const addDeadline = useCallback(
     async (input: AddDeadlineInput): Promise<CaseDeadline | null> => {
@@ -355,6 +415,8 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     addDeadline,
     toggleDeadline,
     removeDeadline,
+    narratives: selectedNarratives,
+    addNarrativeEntry,
   };
 
   return <CasesContext.Provider value={value}>{children}</CasesContext.Provider>;

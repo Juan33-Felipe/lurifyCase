@@ -98,6 +98,18 @@ export interface NarrativeProcessingResult {
   canvas: CanvasSnapshot;
 }
 
+export interface CaseNarrativeEntry {
+  id: Uuid;
+  caseId: Uuid;
+  inputType: NarrativeInputType;
+  title?: string;
+  content: string;
+  audioUri?: string;
+  audioDurationSec?: number;
+  timestamp: Timestamp;
+  generatedCount?: number;
+}
+
 // -- Auth (FR-008)
 export interface UserProfile {
   id: Uuid;

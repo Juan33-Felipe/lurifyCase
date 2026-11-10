@@ -2,6 +2,7 @@ import {
   AuditReport,
   Case,
   CaseList,
+  CaseNarrativeEntry,
   CanvasSnapshot,
 } from '../types/api.types';
 
@@ -219,4 +220,43 @@ export const mockAuditReports: Record<string, AuditReport> = {
       },
     ],
   },
+};
+
+export const mockNarrativeEntries: Record<string, CaseNarrativeEntry[]> = {
+  'case-001': [
+    {
+      id: 'narrative-001-1',
+      caseId: 'case-001',
+      inputType: 'VOICE',
+      title: 'Relato pericial de telemetría y atraque en muelle 4',
+      content:
+        'El perito informático verificó que el dispositivo móvil del imputado se conectó a la antena repetidora del Muelle 4 a las 23:42 horas del 10 de octubre. Asimismo, la bitácora portuaria acredita que una embarcación no registrada realizó maniobras de atraque en ese mismo lapso.',
+      audioDurationSec: 28,
+      timestamp: '2026-10-12T09:15:00Z',
+      generatedCount: 2,
+    },
+    {
+      id: 'narrative-001-2',
+      caseId: 'case-001',
+      inputType: 'TEXT',
+      title: 'Ampliación testimonial sobre custodia de registros',
+      content:
+        'Declaración jurada del jefe de seguridad portuaria confirmando la cadena de custodia de las grabaciones y registros de acceso al muelle, admisible conforme a la regla de evidencia FRE 803(6).',
+      timestamp: '2026-10-15T14:30:00Z',
+      generatedCount: 2,
+    },
+  ],
+  'case-002': [
+    {
+      id: 'narrative-002-1',
+      caseId: 'case-002',
+      inputType: 'VOICE',
+      title: 'Dictado de hechos: retraso en despacho aduanero y ruptura térmica',
+      content:
+        'El cliente relata que la carga de productos biológicos arribó con un retraso injustificado de 72 horas. El sensor telemático registró temperaturas superiores a 18°C cuando el contrato estipulaba refrigeración continua entre 2°C y 8°C.',
+      audioDurationSec: 32,
+      timestamp: '2026-09-15T11:45:00Z',
+      generatedCount: 3,
+    },
+  ],
 };
