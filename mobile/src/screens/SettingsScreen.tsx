@@ -1,13 +1,26 @@
 import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { MaterialIcons as Icon } from '@expo/vector-icons';
-import { GlassButton, Reveal, ScreenHeader, WavePatternBackground } from '../components/ui';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import {
+  AmbientBackground,
+  GlassButton,
+  GlassIconButton,
+  GroupedSection,
+  HeroCard,
+  SegmentedControl,
+  Symbol,
+  Text,
+  radii,
+  usePalette,
+} from '../components/apple';
 import { useAuth } from '../context/AuthContext';
-import { useSettings, useTheme } from '../context/SettingsContext';
-import { fonts, radius } from '../theme/theme';
+import { useSettings } from '../context/SettingsContext';
 
+/**
+ * Pantalla de Ajustes y Perfil con el kit de diseño estilo Apple de Iurify Case.
+ */
 export default function SettingsScreen() {
-  const palette = useTheme();
+  const palette = usePalette();
   const {
     t,
     theme,
@@ -30,7 +43,9 @@ export default function SettingsScreen() {
       Alert.alert(t('settings.biometric'), t('settings.biometricUnavailable'));
       return;
     }
-    if (await confirmBiometrics(t('settings.biometricConfirm'))) setBiometricEnabled(true);
+    if (await confirmBiometrics(t('settings.biometricConfirm'))) {
+      setBiometricEnabled(true);
+    }
   };
 
   const initials = (user?.fullName ?? 'LC')
@@ -42,326 +57,251 @@ export default function SettingsScreen() {
     .toUpperCase();
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
-      <ScreenHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
-
+    <AmbientBackground>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Lawyer Profile Dark Charcoal Card with Wave Overlay */}
-        <Reveal index={0}>
+        {/* Tarjeta Héroe superior estilo Apple con información de perfil */}
+        <HeroCard>
+          <View style={styles.brandRow}>
+            <Text variant="headline">
+              Iurify <Text variant="headline" weight="500" color={palette.secondaryLabel}>Case</Text>
+            </Text>
+            <GlassIconButton icon="brand" size={36} accessibilityLabel="Iurify Case" />
+          </View>
+
+          <Animated.View entering={FadeIn.duration(260)} style={styles.heroText}>
+            <Text variant="subheadline" weight="500" color={palette.secondaryLabel}>
+              {t('settings.subtitle')}
+            </Text>
+            <Text variant="display" style={styles.headline} accessibilityRole="header">
+              {t('settings.title')}
+            </Text>
+          </Animated.View>
+
+          {/* Tarjeta de perfil del abogado */}
           <View
             style={[
-              styles.profileCard,
+              styles.profileBanner,
               {
-                backgroundColor: palette.charcoal,
-                shadowColor: palette.shadow,
+                backgroundColor: palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.65)',
+                borderColor: palette.glass.border,
               },
             ]}
           >
-            <WavePatternBackground variant="card" />
-            <View style={styles.avatarCircle}>
-              <Text style={{ fontFamily: fonts.heading, fontSize: 18, color: '#1E1E20' }}>
+            <View style={[styles.avatarCircle, { backgroundColor: palette.groupedBackground }]}>
+              <Text variant="headline" weight="700" color={palette.label}>
                 {initials}
               </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: fonts.heading,
-                  fontSize: 17,
-                  color: palette.onCharcoal,
-                }}
-              >
+            <View style={styles.profileText}>
+              <Text variant="headline" numberOfLines={1}>
                 {user?.fullName ?? t('settings.notSignedIn')}
               </Text>
-              <Text
-                style={{
-                  fontFamily: fonts.body,
-                  fontSize: 13,
-                  color: palette.onCharcoalMuted,
-                  marginTop: 3,
-                }}
-              >
+              <Text variant="footnote" color={palette.secondaryLabel} numberOfLines={1}>
                 {user?.email ?? t('settings.role')}
               </Text>
             </View>
           </View>
-        </Reveal>
+        </HeroCard>
 
-        {/* Display & Language Section */}
-        <Reveal index={1}>
-          <Section title={t('settings.appearance')}>
-            <Row label={t('settings.theme')}>
-              <Segmented
-                value={theme}
-                onChange={setTheme}
-                options={[
-                  { value: 'light', label: t('settings.theme.light'), icon: 'light-mode' },
-                  { value: 'dark', label: t('settings.theme.dark'), icon: 'dark-mode' },
-                ]}
-              />
-            </Row>
-            <Row label={t('settings.language')}>
-              <Segmented
-                value={language}
-                onChange={setLanguage}
-                options={[
-                  { value: 'en', label: t('settings.language.en'), icon: 'language' },
-                  { value: 'es', label: t('settings.language.es'), icon: 'language' },
-                ]}
-              />
-            </Row>
-            <View style={styles.securityRow}>
-              <View
-                style={[
-                  styles.securityIconBox,
-                  { backgroundColor: palette.secondaryCard },
-                ]}
-              >
-                <Icon name="translate" size={20} color={palette.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: fonts.semibold, fontSize: 14.5, color: palette.text }}>
-                  {t('settings.autoTranslate')}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: fonts.body,
-                    fontSize: 12,
-                    color: palette.textMuted,
-                    marginTop: 2,
-                  }}
-                >
-                  {t('settings.autoTranslateHint')}
-                </Text>
-              </View>
-              <Switch
-                value={autoTranslate}
-                onValueChange={setAutoTranslate}
-                trackColor={{ false: palette.border, true: palette.charcoal }}
-                thumbColor={autoTranslate ? palette.surface : palette.surfaceElevated}
-              />
-            </View>
-          </Section>
-        </Reveal>
-
-        {/* Confidentiality & Biometrics Section */}
-        <Reveal index={2}>
-          <Section title={t('settings.security')}>
-            <View style={styles.securityRow}>
-              <View
-                style={[
-                  styles.securityIconBox,
-                  { backgroundColor: palette.secondaryCard },
-                ]}
-              >
-                <Icon name="fingerprint" size={22} color={palette.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: fonts.semibold, fontSize: 15, color: palette.text }}>
-                  {t('settings.biometric')}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: fonts.body,
-                    fontSize: 12.5,
-                    color: palette.textMuted,
-                    marginTop: 2,
-                  }}
-                >
-                  {t('settings.biometricHint')}
-                </Text>
-              </View>
-              <Switch
-                value={biometricEnabled}
-                onValueChange={toggleBiometric}
-                trackColor={{ false: palette.border, true: palette.charcoal }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          </Section>
-        </Reveal>
-
-        {user ? (
-          <Reveal index={3}>
-            <GlassButton
-              label={t('settings.signOut')}
-              icon="logout"
-              variant="danger"
-              onPress={signOut}
-            />
-          </Reveal>
-        ) : null}
-      </ScrollView>
-    </View>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const palette = useTheme();
-  return (
-    <View style={{ gap: 10 }}>
-      <Text
-        style={{
-          fontFamily: fonts.semibold,
-          fontSize: 16,
-          color: palette.text,
-          paddingHorizontal: 4,
-        }}
-      >
-        {title}
-      </Text>
-      <View
-        style={[
-          styles.sectionCard,
-          {
-            backgroundColor: palette.surface,
-            borderColor: palette.border,
-            shadowColor: palette.shadow,
-          },
-        ]}
-      >
-        {children}
-      </View>
-    </View>
-  );
-}
-
-function Row({
-  label,
-  children,
-  last,
-}: {
-  label: string;
-  children: React.ReactNode;
-  last?: boolean;
-}) {
-  const palette = useTheme();
-  return (
-    <View
-      style={{
-        padding: 18,
-        gap: 12,
-        borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: palette.border,
-      }}
-    >
-      <Text style={{ fontFamily: fonts.semibold, fontSize: 14.5, color: palette.text }}>
-        {label}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
-function Segmented<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { value: T; label: string; icon: React.ComponentProps<typeof Icon>['name'] }[];
-}) {
-  const palette = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        padding: 4,
-        borderRadius: radius.md,
-        backgroundColor: palette.secondaryCard,
-        borderWidth: 1,
-        borderColor: palette.border,
-      }}
-    >
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              paddingVertical: 10,
-              borderRadius: radius.sm,
-              backgroundColor: active ? palette.charcoal : 'transparent',
-            }}
-          >
-            <Icon
-              name={o.icon}
-              size={17}
-              color={active ? '#FFFFFF' : palette.textMuted}
-            />
-            <Text
-              style={{
-                fontFamily: active ? fonts.heading : fonts.medium,
-                fontSize: 13,
-                color: active ? '#FFFFFF' : palette.textMuted,
-              }}
-            >
-              {o.label}
+        {/* Secciones de configuración agrupadas al estilo de Ajustes de iOS */}
+        <Animated.View entering={FadeInDown.duration(380).delay(80)} style={styles.body}>
+          {/* 1. Sección de Apariencia */}
+          <View style={styles.section}>
+            <Text variant="footnote" weight="600" color={palette.secondaryLabel} style={styles.sectionHeaderTitle}>
+              {t('settings.appearance').toUpperCase()}
             </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+
+            <GroupedSection>
+              {/* Selector de Tema */}
+              <View style={styles.settingRow}>
+                <View style={styles.rowLabelGroup}>
+                  <View style={[styles.settingIconBox, { backgroundColor: palette.groupedBackground }]}>
+                    <Symbol name={theme === 'dark' ? 'darkMode' : 'lightMode'} size={17} color={palette.label} />
+                  </View>
+                  <Text variant="body" weight="500">
+                    {t('settings.theme')}
+                  </Text>
+                </View>
+                <SegmentedControl
+                  value={theme}
+                  onChange={setTheme}
+                  style={styles.segmentedInline}
+                  options={[
+                    { value: 'light', label: t('settings.theme.light') },
+                    { value: 'dark', label: t('settings.theme.dark') },
+                  ]}
+                />
+              </View>
+
+              {/* Selector de Idioma */}
+              <View style={styles.settingRow}>
+                <View style={styles.rowLabelGroup}>
+                  <View style={[styles.settingIconBox, { backgroundColor: palette.groupedBackground }]}>
+                    <Symbol name="globe" size={17} color={palette.label} />
+                  </View>
+                  <Text variant="body" weight="500">
+                    {t('settings.language')}
+                  </Text>
+                </View>
+                <SegmentedControl
+                  value={language}
+                  onChange={setLanguage}
+                  style={styles.segmentedInline}
+                  options={[
+                    { value: 'en', label: t('settings.language.en') },
+                    { value: 'es', label: t('settings.language.es') },
+                  ]}
+                />
+              </View>
+
+              {/* Interruptor de Traducción Automática */}
+              <View style={styles.settingRow}>
+                <View style={styles.rowLabelGroup}>
+                  <View style={[styles.settingIconBox, { backgroundColor: palette.groupedBackground }]}>
+                    <Symbol name="translate" size={17} color={palette.label} />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text variant="body" weight="500">
+                      {t('settings.autoTranslate')}
+                    </Text>
+                    <Text variant="footnote" color={palette.secondaryLabel} style={{ marginTop: 2 }}>
+                      {t('settings.autoTranslateHint')}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={autoTranslate}
+                  onValueChange={setAutoTranslate}
+                  trackColor={{ false: palette.separator, true: palette.label }}
+                  thumbColor={Platform.OS === 'ios' ? undefined : '#FFFFFF'}
+                />
+              </View>
+            </GroupedSection>
+          </View>
+
+          {/* 2. Sección de Seguridad */}
+          <View style={styles.section}>
+            <Text variant="footnote" weight="600" color={palette.secondaryLabel} style={styles.sectionHeaderTitle}>
+              {t('settings.security').toUpperCase()}
+            </Text>
+
+            <GroupedSection>
+              <View style={styles.settingRow}>
+                <View style={styles.rowLabelGroup}>
+                  <View style={[styles.settingIconBox, { backgroundColor: palette.groupedBackground }]}>
+                    <Symbol name="fingerprint" size={18} color={palette.label} />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text variant="body" weight="500">
+                      {t('settings.biometric')}
+                    </Text>
+                    <Text variant="footnote" color={palette.secondaryLabel} style={{ marginTop: 2 }}>
+                      {t('settings.biometricHint')}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={toggleBiometric}
+                  trackColor={{ false: palette.separator, true: palette.label }}
+                  thumbColor={Platform.OS === 'ios' ? undefined : '#FFFFFF'}
+                />
+              </View>
+            </GroupedSection>
+          </View>
+
+          {/* 3. Acción de Cerrar Sesión */}
+          {user && (
+            <View style={styles.logoutWrapper}>
+              <GlassButton
+                label={t('settings.signOut')}
+                icon="logout"
+                onPress={signOut}
+              />
+            </View>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </AmbientBackground>
   );
 }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 140,
-    gap: 22,
+    paddingBottom: 130,
   },
-  profileCard: {
-    borderRadius: 24,
-    padding: 20,
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    overflow: 'hidden',
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    justifyContent: 'space-between',
+  },
+  heroText: {
+    marginTop: 22,
+    gap: 4,
+  },
+  headline: {
+    marginTop: 2,
+  },
+  profileBanner: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: radii.group,
+    borderWidth: 1,
+    gap: 14,
   },
   avatarCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#F1F4FB',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+  profileText: {
+    flex: 1,
+    gap: 3,
   },
-  securityRow: {
+  body: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    gap: 24,
+  },
+  section: {
+    gap: 8,
+  },
+  sectionHeaderTitle: {
+    paddingHorizontal: 12,
+    letterSpacing: 0.4,
+  },
+  settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 18,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 56,
   },
-  securityIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+  rowLabelGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  segmentedInline: {
+    minWidth: 150,
+  },
+  logoutWrapper: {
+    marginTop: 6,
   },
 });
