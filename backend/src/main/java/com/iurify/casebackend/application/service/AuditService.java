@@ -32,6 +32,10 @@ public class AuditService {
             - MISSING_LEGAL_BASIS
             - CASE_THEORY_WEAKNESS
             - STRUCTURAL_ISSUE
+
+            Language instruction:
+            Analyze the language of the case title, narrative, and nodes. If the content is in Spanish, output all titles, descriptions, recommendations, and summary in professional Spanish. If in English, output in English.
+
             Return JSON with:
             {
               "solidityScore": 0-100,
