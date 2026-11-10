@@ -158,3 +158,18 @@ export interface AuditReport {
   generatedAt: Timestamp;
   alerts: AuditAlert[];
 }
+
+// -- Deadlines / Plazos de entrega (Audit & Timeline)
+export type DeadlinePriority = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface CaseDeadline {
+  id: Uuid;
+  caseId: Uuid;
+  title: string;
+  notes?: string;
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+  priority: DeadlinePriority;
+  completed: boolean;
+  createdAt: Timestamp;
+}
