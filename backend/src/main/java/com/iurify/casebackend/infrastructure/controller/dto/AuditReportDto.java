@@ -15,6 +15,7 @@ public class AuditReportDto {
     private BigDecimal trialReadinessScore;
     private Instant auditedAt;
     private Instant createdAt;
+    private Instant generatedAt;
     private String summary;
     private List<AuditAlertDto> alerts;
     private List<AuditAlertDto> findings;
@@ -40,6 +41,7 @@ public class AuditReportDto {
         this.trialReadinessScore = solidityScore;
         this.auditedAt = auditedAt;
         this.createdAt = auditedAt;
+        this.generatedAt = auditedAt;
         this.summary = summary;
         this.alerts = alerts;
         this.findings = alerts;
@@ -63,6 +65,8 @@ public class AuditReportDto {
     public void setAuditedAt(Instant auditedAt) { this.auditedAt = auditedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Instant getGeneratedAt() { return generatedAt != null ? generatedAt : auditedAt; }
+    public void setGeneratedAt(Instant generatedAt) { this.generatedAt = generatedAt; }
     public String getSummary() { return summary; }
     public void setSummary(String summary) { this.summary = summary; }
     public List<AuditAlertDto> getAlerts() { return alerts; }
