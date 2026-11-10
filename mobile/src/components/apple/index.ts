@@ -19,3 +19,5 @@ export type { TextFieldRowRef } from './GroupedSection';
 export { HeroCard } from './HeroCard';
 export { AmbientBackground } from './AmbientBackground';
 export { InlineMessage } from './InlineMessage';
+export { AudioPlayerCard } from './AudioPlayerCard';
+export type { AudioPlayerCardProps } from './AudioPlayerCard';

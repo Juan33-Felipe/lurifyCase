@@ -60,6 +60,10 @@ export const symbols = {
   lightMode: { ios: 'sun.max.fill', android: 'light_mode', web: 'light_mode' },
   darkMode: { ios: 'moon.fill', android: 'dark_mode', web: 'dark_mode' },
   globe: { ios: 'globe', android: 'language', web: 'language' },
+  play: { ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' },
+  pause: { ios: 'pause.fill', android: 'pause', web: 'pause' },
+  waveform: { ios: 'waveform', android: 'graphic_eq', web: 'graphic_eq' },
+  volume: { ios: 'speaker.wave.2.fill', android: 'volume_up', web: 'volume_up' },
 } satisfies Record<string, SymbolName>;
 
 export type SymbolKey = keyof typeof symbols;
