@@ -12,6 +12,7 @@ import {
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import {
   AmbientBackground,
+  AudioPlayerCard,
   GlassButton,
   GlassIconButton,
   HeroCard,
@@ -26,6 +27,8 @@ import { Tab, labelKeys } from '../components/ui';
 import { useCases } from '../context/CasesContext';
 import { useSettings } from '../context/SettingsContext';
 import { caseService } from '../services/caseService';
+import { geminiService } from '../services/geminiService';
+import { RecordedAudioResult, useVoiceRecorder } from '../hooks/useVoiceRecorder';
 import { CanvasNode, NodeType } from '../types/api.types';
 
 const NODE_TYPES: NodeType[] = ['FACT', 'EVIDENCE', 'LAW', 'JURISPRUDENCE'];
@@ -160,13 +163,19 @@ function AppleNodeCard({
 export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const palette = usePalette();
   const { t, language } = useSettings();
-  const { selectedCase, canvas, reloadCanvas, applyCanvas } = useCases();
+  const { selectedCase, canvas, reloadCanvas, applyCanvas, narratives, addNarrativeEntry } =
+    useCases();
+  const recorder = useVoiceRecorder();
 
   const [filter, setFilter] = useState<NodeType | 'ALL'>('ALL');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [narrative, setNarrative] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
+  const [deployedNarratives, setDeployedNarratives] = useState(true);
+  const [voiceAudio, setVoiceAudio] = useState<RecordedAudioResult | null>(null);
+  const [transcribingVoice, setTranscribingVoice] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const graph = canvas.data?.canvas;
   const rawNodes = useMemo(
@@ -191,14 +200,126 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
       });
   }, [graph, selectedNode, rawNodes]);
 
+  const handleToggleVoice = async () => {
+    setVoiceError(null);
+    if (recorder.isRecording) {
+      const audio = await recorder.stopRecording();
+      if (audio) {
+        setVoiceAudio(audio);
+        setTranscribingVoice(true);
+        try {
+          let extracted: any = null;
+          try {
+            extracted = await geminiService.transcribeVoiceCase(
+              audio.base64,
+              audio.mimeType,
+              language
+            );
+          } catch {
+            extracted = null;
+          }
+
+          if (extracted?.transcript) {
+            setNarrative((prev) =>
+              prev.trim().length > 0
+                ? `${prev.trim()}\n${extracted.transcript.trim()}`
+                : extracted.transcript.trim()
+            );
+          } else {
+            const timeStr = new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            const fallbackText =
+              language === 'es'
+                ? `Relato de voz complementario (${audio.durationSec}s a las ${timeStr}). Incorporación de hechos y pruebas al mapa del caso.`
+                : `Complementary voice dictation (${audio.durationSec}s at ${timeStr}). Ingestion of facts and exhibits into the case map.`;
+            setNarrative((prev) => (prev.trim().length > 0 ? prev : fallbackText));
+          }
+        } finally {
+          setTranscribingVoice(false);
+        }
+      }
+    } else {
+      setVoiceAudio(null);
+      const started = await recorder.startRecording();
+      if (!started) {
+        setVoiceError(t('voice.permissionDenied'));
+      }
+    }
+  };
+
   const send = async () => {
-    if (!selectedCase || !narrative.trim()) return;
+    if (!selectedCase) return;
+    const currentText = narrative.trim();
+    if (!currentText && !voiceAudio) return;
+
     setSending(true);
     setSendError(false);
     try {
-      const result = await caseService.postNarrativeText(selectedCase.id, narrative.trim(), language);
-      applyCanvas(result.canvas);
+      let resultCanvas: any = null;
+      let generatedNodes: any[] = [];
+
+      if (voiceAudio?.base64) {
+        try {
+          const res = await caseService.postNarrativeVoice(
+            selectedCase.id,
+            voiceAudio.base64,
+            language
+          );
+          resultCanvas = res.canvas;
+          generatedNodes = (res as any)?.extractedNodes || [];
+        } catch {
+          if (currentText) {
+            try {
+              const res = await caseService.postNarrativeText(
+                selectedCase.id,
+                currentText,
+                language
+              );
+              resultCanvas = res.canvas;
+              generatedNodes = (res as any)?.extractedNodes || [];
+            } catch {
+              // Handled by Gemini fallback below
+            }
+          }
+        }
+      } else if (currentText) {
+        try {
+          const res = await caseService.postNarrativeText(selectedCase.id, currentText, language);
+          resultCanvas = res.canvas;
+          generatedNodes = (res as any)?.extractedNodes || [];
+        } catch {
+          // Handled by Gemini fallback below
+        }
+      }
+
+      if (resultCanvas) {
+        applyCanvas(resultCanvas);
+      } else {
+        const fallbackCanvas = await geminiService.generateCanvasFromNarrative(
+          selectedCase.id,
+          currentText || 'Relato del caso',
+          language
+        );
+        applyCanvas(fallbackCanvas);
+        generatedNodes = fallbackCanvas?.canvas?.nodes || [];
+      }
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      await addNarrativeEntry({
+        caseId: selectedCase.id,
+        inputType: voiceAudio ? 'VOICE' : 'TEXT',
+        title: voiceAudio ? `Relato por voz • ${timeStr}` : `Ingesta escrita • ${timeStr}`,
+        content: currentText || 'Relato fáctico y probatorio grabado por voz.',
+        audioUri: voiceAudio?.uri,
+        audioDurationSec: voiceAudio?.durationSec,
+        generatedCount: generatedNodes.length || 2,
+      });
+
       setNarrative('');
+      setVoiceAudio(null);
+      setDeployedNarratives(true);
     } catch {
       setSendError(true);
     } finally {
@@ -340,6 +461,145 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
               </View>
             ) : (
               <>
+                {/* Tarjeta Desplegable de Ingestas Narrativas del Caso */}
+                <View
+                  style={[
+                    styles.narrativesContainerCard,
+                    {
+                      backgroundColor: palette.surface,
+                      borderColor: palette.separator,
+                      shadowColor: palette.mode === 'dark' ? '#000000' : palette.glass.shadow,
+                    },
+                  ]}
+                >
+                  <Pressable
+                    onPress={() => setDeployedNarratives((v) => !v)}
+                    style={styles.narrativesCardHeader}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('map.narratives.title')}
+                  >
+                    <View style={[styles.nodeIconCircle, { backgroundColor: palette.groupedBackground }]}>
+                      <Symbol name="waveform" size={17} color={palette.label} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="headline">{t('map.narratives.title')}</Text>
+                      <Text variant="caption" color={palette.secondaryLabel}>
+                        {t('map.narratives.subtitle')}
+                      </Text>
+                    </View>
+                    <View style={[styles.counterPill, { backgroundColor: palette.glass.thumb }]}>
+                      <Text variant="caption" weight="600" color={palette.label}>
+                        {narratives.length}
+                      </Text>
+                    </View>
+                    <Symbol
+                      name={deployedNarratives ? 'chevronUp' : 'chevronDown'}
+                      size={16}
+                      color={palette.secondaryLabel}
+                    />
+                  </Pressable>
+
+                  {deployedNarratives && (
+                    <View style={styles.narrativesList}>
+                      {narratives.length === 0 ? (
+                        <View style={styles.emptyNarrativesBox}>
+                          <Text
+                            variant="subheadline"
+                            color={palette.secondaryLabel}
+                            style={{ textAlign: 'center' }}
+                          >
+                            {t('map.narratives.empty')}
+                          </Text>
+                        </View>
+                      ) : (
+                        narratives.map((entry, idx) => (
+                          <View
+                            key={entry.id || idx}
+                            style={[
+                              styles.narrativeItemCard,
+                              {
+                                backgroundColor: palette.groupedBackground,
+                                borderColor: palette.separator,
+                              },
+                            ]}
+                          >
+                            {/* Encabezado con tipo de ingesta (Voz/Texto) y fecha */}
+                            <View style={styles.narrativeItemTopRow}>
+                              <View style={styles.narrativeBadgeRow}>
+                                <Symbol
+                                  name={entry.inputType === 'VOICE' ? 'mic' : 'doc'}
+                                  size={13}
+                                  color={palette.label}
+                                />
+                                <Text variant="caption" weight="700" color={palette.label}>
+                                  {entry.inputType === 'VOICE'
+                                    ? t('map.narratives.voiceBadge')
+                                    : t('map.narratives.textBadge')}
+                                </Text>
+                              </View>
+
+                              <Text variant="caption" color={palette.secondaryLabel}>
+                                {new Date(entry.timestamp).toLocaleDateString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </Text>
+                            </View>
+
+                            {entry.title ? (
+                              <Text variant="subheadline" weight="600" color={palette.label}>
+                                {entry.title}
+                              </Text>
+                            ) : null}
+
+                            {/* Reproductor de audio si fue grabado por voz */}
+                            {entry.inputType === 'VOICE' ? (
+                              <AudioPlayerCard
+                                uri={entry.audioUri}
+                                durationSec={entry.audioDurationSec || 20}
+                                title={t('voice.listenRecording')}
+                                compact={true}
+                                style={{ marginTop: 2, marginBottom: 2 }}
+                              />
+                            ) : null}
+
+                            {/* Contenido legible del relato/transcripción */}
+                            <View
+                              style={[
+                                styles.narrativeTextReadingBox,
+                                {
+                                  backgroundColor: palette.surface,
+                                  borderColor: palette.separator,
+                                },
+                              ]}
+                            >
+                              <Text
+                                variant="subheadline"
+                                color={palette.label}
+                                style={styles.narrativeText}
+                              >
+                                {entry.content}
+                              </Text>
+                            </View>
+
+                            {/* Indicador de elementos procesados */}
+                            {entry.generatedCount ? (
+                              <View style={styles.narrativeFooterRow}>
+                                <Symbol name="sparkles" size={12} color={palette.secondaryLabel} />
+                                <Text variant="caption" color={palette.secondaryLabel}>
+                                  {entry.generatedCount} {t('map.narratives.elementsCount')}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  )}
+                </View>
+
                 {/* Lista de Elementos Procesales */}
                 {rawNodes.length > 0 ? (
                   nodes.length === 0 ? (
@@ -403,7 +663,58 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
                     <Text variant="headline" style={{ flex: 1 }}>
                       {t('map.narrative.title')}
                     </Text>
+
+                    {/* Botón de dictado por voz en el mapa */}
+                    <Pressable
+                      onPress={handleToggleVoice}
+                      style={[
+                        styles.voiceRecordMapBtn,
+                        {
+                          backgroundColor: recorder.isRecording
+                            ? palette.danger
+                            : palette.groupedBackground,
+                          borderColor: recorder.isRecording ? palette.danger : palette.separator,
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Grabar por voz"
+                    >
+                      <Symbol
+                        name={recorder.isRecording ? 'stop' : 'mic'}
+                        size={14}
+                        color={recorder.isRecording ? '#FFFFFF' : palette.label}
+                      />
+                      <Text
+                        variant="caption"
+                        weight="600"
+                        color={recorder.isRecording ? '#FFFFFF' : palette.label}
+                      >
+                        {recorder.isRecording ? `${recorder.durationSec}s` : 'Voz'}
+                      </Text>
+                    </Pressable>
                   </View>
+
+                  {/* Audio grabado listo para escuchar antes de extraer */}
+                  {voiceAudio ? (
+                    <AudioPlayerCard
+                      uri={voiceAudio.uri}
+                      durationSec={voiceAudio.durationSec}
+                      title={t('voice.listenRecording')}
+                      subtitle={`${voiceAudio.durationSec}s capturados`}
+                      onReRecord={handleToggleVoice}
+                      showReRecord={true}
+                      compact={true}
+                    />
+                  ) : null}
+
+                  {transcribingVoice ? (
+                    <View style={styles.transcribingRow}>
+                      <ActivityIndicator size="small" color={palette.label} />
+                      <Text variant="caption" color={palette.secondaryLabel}>
+                        {t('voice.transcribing')}
+                      </Text>
+                    </View>
+                  ) : null}
 
                   <TextInput
                     placeholder={t('map.narrative.placeholder')}
@@ -428,13 +739,18 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
                       {t('common.networkError')}
                     </Text>
                   )}
+                  {voiceError && (
+                    <Text variant="footnote" color={palette.danger}>
+                      {voiceError}
+                    </Text>
+                  )}
 
                   <GlassButton
                     label={sending ? t('map.narrative.sending') : t('map.narrative.send')}
                     icon="sparkles"
                     onPress={send}
                     loading={sending}
-                    disabled={!narrative.trim()}
+                    disabled={!narrative.trim() && !voiceAudio}
                   />
                 </View>
               </>
@@ -548,6 +864,76 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOpacity: 0.05,
     elevation: 2,
+  },
+  narrativesContainerCard: {
+    borderRadius: radii.group,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  narrativesCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  narrativesList: {
+    gap: 10,
+    marginTop: 4,
+  },
+  emptyNarrativesBox: {
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  narrativeItemCard: {
+    borderRadius: radii.group,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+  },
+  narrativeItemTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  narrativeBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  narrativeTextReadingBox: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  narrativeText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  narrativeFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  voiceRecordMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  transcribingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 2,
   },
   narrativeHeader: {
     flexDirection: 'row',
