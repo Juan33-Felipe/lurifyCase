@@ -268,13 +268,15 @@ public class GeminiAdapter implements IAClient {
             pos.put("x", 440.0);
             pos.put("y", 140.0 + (baseOffset / 3) * 200.0);
 
+            boolean isSpanish = isSpanishText(narrativeText);
+
             Map<String, Object> companionNode = new LinkedHashMap<>();
             companionNode.put("id", companionId);
             companionNode.put("type", companionType);
-            companionNode.put("title", "EVIDENCE".equals(companionType)
-                    ? "Corroborating Record / Testimony"
-                    : "Derived Factual Premise");
-            companionNode.put("summary", "Inferred companion element from narrative: " + narrativeText.trim());
+            companionNode.put("title", isSpanish
+                    ? ("EVIDENCE".equals(companionType) ? "Registro probatorio / Testimonio" : "Premisa fáctica derivada")
+                    : ("EVIDENCE".equals(companionType) ? "Corroborating Record / Testimony" : "Derived Factual Premise"));
+            companionNode.put("summary", (isSpanish ? "Elemento complementario inferido de la narrativa: " : "Inferred companion element from narrative: ") + narrativeText.trim());
             companionNode.put("position", pos);
             companionNode.put("confidence", 0.85);
             companionNode.put("tags", List.of("ai-inferred", companionType.toLowerCase()));
@@ -282,9 +284,9 @@ public class GeminiAdapter implements IAClient {
             newNodes.add(companionNode);
 
             if ("EVIDENCE".equals(companionType)) {
-                newEdges.add(createEdge(companionId, primaryId, "SUPPORTS", "Supports narrated fact", 0.86));
+                newEdges.add(createEdge(companionId, primaryId, "SUPPORTS", isSpanish ? "Sustenta el hecho narrado" : "Supports narrated fact", 0.86));
             } else {
-                newEdges.add(createEdge(primaryId, companionId, "APPLIES_TO", "Applies to factual premise", 0.86));
+                newEdges.add(createEdge(primaryId, companionId, "APPLIES_TO", isSpanish ? "Aplica a la premisa fáctica" : "Applies to factual premise", 0.86));
             }
         }
 
@@ -298,22 +300,27 @@ public class GeminiAdapter implements IAClient {
         List<AuditFinding> findings = new ArrayList<>();
         double score = 92.0;
 
+        boolean isSpanish = isSpanishContext(caseModel, graphData);
+
         if (nodes.isEmpty()) {
             findings.add(new AuditFinding(
                     UUID.randomUUID(),
                     null,
                     "STRUCTURAL_ISSUE",
                     "HIGH",
-                    "Empty Case Strategy Canvas",
-                    "The legal canvas currently contains no factual, evidentiary, or statutory nodes.",
-                    "Ingest a case narrative or add initial FACT and EVIDENCE nodes before proceeding to trial preparation.",
+                    isSpanish ? "Lienzo de estrategia del caso vacío" : "Empty Case Strategy Canvas",
+                    isSpanish ? "El lienzo jurídico actualmente no contiene nodos fácticos, probatorios ni normativos."
+                              : "The legal canvas currently contains no factual, evidentiary, or statutory nodes.",
+                    isSpanish ? "Ingresar una narrativa del caso o agregar nodos iniciales de HECHO y PRUEBA antes de proceder a la preparación del juicio."
+                              : "Ingest a case narrative or add initial FACT and EVIDENCE nodes before proceeding to trial preparation.",
                     List.of(),
                     List.of(),
                     Instant.now()
             ));
             return new AuditEvaluationResult(
                     new BigDecimal("15.00"),
-                    "Critical structural gap: the canvas has no nodes to support a legal theory.",
+                    isSpanish ? "Vacío estructural crítico: el lienzo no tiene nodos que sustenten una teoría del caso."
+                              : "Critical structural gap: the canvas has no nodes to support a legal theory.",
                     findings
             );
         }
@@ -368,9 +375,11 @@ public class GeminiAdapter implements IAClient {
                         null,
                         "EVIDENCE_CONFLICT",
                         "HIGH",
-                        "Direct Evidentiary Contradiction Detected",
-                        "A CONTRADICTS relationship exists between nodes on the canvas, creating an adversarial vulnerability during cross-examination.",
-                        "Prepare impeachment rebuttal or corroborate the contested node with independent documentary evidence.",
+                        isSpanish ? "Contradicción probatoria directa detectada" : "Direct Evidentiary Contradiction Detected",
+                        isSpanish ? "Existe una relación de CONTRADICCIÓN entre nodos del lienzo, lo que genera una vulnerabilidad durante el contrainterrogatorio."
+                                  : "A CONTRADICTS relationship exists between nodes on the canvas, creating an adversarial vulnerability during cross-examination.",
+                        isSpanish ? "Preparar refutación de impugnación o corroborar el nodo controvertido con prueba documental independiente."
+                                  : "Prepare impeachment rebuttal or corroborate the contested node with independent documentary evidence.",
                         affectedNodes,
                         affectedEdges,
                         Instant.now()
@@ -392,9 +401,12 @@ public class GeminiAdapter implements IAClient {
                     null,
                     "UNSUPPORTED_FACT",
                     "HIGH",
-                    "Uncorroborated Factual Assertions (" + unsupportedFacts.size() + ")",
-                    "One or more FACT nodes lack an incoming SUPPORTS link from an EVIDENCE node, leaving key factual assertions open to challenge.",
-                    "Link documentary, testimonial, or expert EVIDENCE nodes to each uncorroborated FACT node.",
+                    isSpanish ? ("Aseveraciones fácticas sin corroborar (" + unsupportedFacts.size() + ")")
+                              : ("Uncorroborated Factual Assertions (" + unsupportedFacts.size() + ")"),
+                    isSpanish ? "Uno o más nodos de HECHO carecen de un enlace de SOPORTE entrante desde un nodo de PRUEBA, lo que deja abiertas a impugnación aseveraciones fácticas clave."
+                              : "One or more FACT nodes lack an incoming SUPPORTS link from an EVIDENCE node, leaving key factual assertions open to challenge.",
+                    isSpanish ? "Vincular nodos de PRUEBA documentales, testimoniales o periciales a cada nodo de HECHO no corroborado."
+                              : "Link documentary, testimonial, or expert EVIDENCE nodes to each uncorroborated FACT node.",
                     unsupportedFacts,
                     List.of(),
                     Instant.now()
@@ -409,9 +421,11 @@ public class GeminiAdapter implements IAClient {
                     null,
                     "MISSING_LEGAL_BASIS",
                     "MEDIUM",
-                    "Missing Statutory or Jurisprudential Anchor",
-                    "The canvas contains factual/evidentiary elements but no LAW or JURISPRUDENCE nodes anchoring the legal theory.",
-                    "Add applicable statutory provisions (LAW) or binding case precedent (JURISPRUDENCE) connected via APPLIES_TO or CITES edges.",
+                    isSpanish ? "Falta de fundamento legal o jurisprudencial" : "Missing Statutory or Jurisprudential Anchor",
+                    isSpanish ? "El lienzo contiene elementos fácticos/probatorios pero ningún nodo de LEY o JURISPRUDENCIA que sustente la teoría del caso."
+                              : "The canvas contains factual/evidentiary elements but no LAW or JURISPRUDENCE nodes anchoring the legal theory.",
+                    isSpanish ? "Agregar disposiciones normativas aplicables (LEY) o precedentes vinculantes (JURISPRUDENCIA) conectados mediante relaciones APLICA_A o CITA."
+                              : "Add applicable statutory provisions (LAW) or binding case precedent (JURISPRUDENCE) connected via APPLIES_TO or CITES edges.",
                     factIds.isEmpty() ? List.of() : List.of(factIds.get(0)),
                     List.of(),
                     Instant.now()
@@ -433,9 +447,12 @@ public class GeminiAdapter implements IAClient {
                     null,
                     "STRUCTURAL_ISSUE",
                     "LOW",
-                    "Isolated Canvas Elements (" + isolatedNodes.size() + ")",
-                    "Certain nodes are disconnected from the primary causal and evidentiary chain.",
-                    "Connect isolated nodes using SUPPORTS, APPLIES_TO, or TEMPORAL_PRECEDES edges, or remove redundant nodes.",
+                    isSpanish ? ("Elementos aislados en el lienzo (" + isolatedNodes.size() + ")")
+                              : ("Isolated Canvas Elements (" + isolatedNodes.size() + ")"),
+                    isSpanish ? "Ciertos nodos se encuentran desconectados de la cadena causal y probatoria principal."
+                              : "Certain nodes are disconnected from the primary causal and evidentiary chain.",
+                    isSpanish ? "Conectar los nodos aislados usando relaciones de SOPORTE, APLICA_A o SECUENCIA_TEMPORAL, o eliminar nodos redundantes."
+                              : "Connect isolated nodes using SUPPORTS, APPLIES_TO, or TEMPORAL_PRECEDES edges, or remove redundant nodes.",
                     isolatedNodes,
                     List.of(),
                     Instant.now()
@@ -452,9 +469,11 @@ public class GeminiAdapter implements IAClient {
                     null,
                     "CASE_THEORY_WEAKNESS",
                     "LOW",
-                    "Anticipate Opposing Counsel Affirmative Defense",
-                    "While all current facts are corroborated by evidence and anchored in law, opposing counsel may challenge chain-of-custody or procedural timelines.",
-                    "Add a procedural timeline verification node or stipulation of authenticity prior to pretrial conference.",
+                    isSpanish ? "Anticipar defensa procesal de la contraparte" : "Anticipate Opposing Counsel Affirmative Defense",
+                    isSpanish ? "Aunque todos los hechos están corroborados por pruebas y anclados a la ley, la contraparte podría impugnar la cadena de custodia o los plazos procesales."
+                              : "While all current facts are corroborated by evidence and anchored in law, opposing counsel may challenge chain-of-custody or procedural timelines.",
+                    isSpanish ? "Agregar un nodo de verificación de cronología procesal o estipulación de autenticidad antes de la audiencia preliminar."
+                              : "Add a procedural timeline verification node or stipulation of authenticity prior to pretrial conference.",
                     highlightNodes,
                     List.of(),
                     Instant.now()
@@ -465,15 +484,25 @@ public class GeminiAdapter implements IAClient {
         double clampedScore = Math.max(10.0, Math.min(98.0, score));
         BigDecimal finalScore = BigDecimal.valueOf(clampedScore).setScale(2, RoundingMode.HALF_UP);
 
-        String summary = String.format(
-                Locale.US,
-                "Audit completed for '%s' (%d nodes, %d edges). Overall Trial Readiness & Solidity Score: %.2f/100 with %d finding(s).",
-                caseModel.getTitle(),
-                nodes.size(),
-                edges.size(),
-                finalScore.doubleValue(),
-                findings.size()
-        );
+        String summary = isSpanish
+                ? String.format(
+                    Locale.ROOT,
+                    "Auditoría completada para '%s' (%d nodos, %d aristas). Solidez y preparación para juicio: %.2f/100 con %d alerta(s).",
+                    caseModel != null ? caseModel.getTitle() : "Lienzo",
+                    nodes.size(),
+                    edges.size(),
+                    finalScore.doubleValue(),
+                    findings.size()
+                )
+                : String.format(
+                    Locale.US,
+                    "Audit completed for '%s' (%d nodes, %d edges). Overall Trial Readiness & Solidity Score: %.2f/100 with %d finding(s).",
+                    caseModel != null ? caseModel.getTitle() : "Canvas",
+                    nodes.size(),
+                    edges.size(),
+                    finalScore.doubleValue(),
+                    findings.size()
+                );
 
         return new AuditEvaluationResult(finalScore, summary, findings);
     }
@@ -675,6 +704,32 @@ public class GeminiAdapter implements IAClient {
             }
         }
         return result;
+    }
+
+    private boolean isSpanishContext(Case caseModel, Map<String, Object> graphData) {
+        if (caseModel != null) {
+            if (isSpanishText(caseModel.getTitle()) || isSpanishText(caseModel.getDescription())) {
+                return true;
+            }
+        }
+        if (graphData != null) {
+            List<Map<String, Object>> nodes = extractMapList(graphData.get("nodes"));
+            for (Map<String, Object> node : nodes) {
+                if (isSpanishText(Objects.toString(node.get("title"), "")) ||
+                    isSpanishText(Objects.toString(node.get("summary"), "")) ||
+                    isSpanishText(Objects.toString(node.get("content"), ""))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isSpanishText(String text) {
+        if (text == null || text.isBlank()) return false;
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.matches(".*[áéíóúñ¿¡].*")) return true;
+        return lower.matches(".*\\b(el|la|los|las|de|del|en|un|una|por|para|con|sobre|contra|caso|expediente|hecho|prueba|pruebas|ley|leyes|artículo|codigo|juez|tribunal|demanda|fiscal|testigo|presento|presentó|dossier)\\b.*");
     }
 
     private UUID parseUuidSafe(String str) {
