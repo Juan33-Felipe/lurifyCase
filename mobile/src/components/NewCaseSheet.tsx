@@ -34,6 +34,7 @@ import { useSettings } from '../context/SettingsContext';
 import { caseService } from '../services/caseService';
 import { geminiService, GeminiVoiceExtractionResult } from '../services/geminiService';
 import { RecordedAudioResult, useVoiceRecorder } from '../hooks/useVoiceRecorder';
+import { CanvasSnapshot } from '../types/api.types';
 import { TranslationKey } from '../i18n/translations';
 
 type Mode = 'form' | 'voice';
@@ -244,8 +245,22 @@ export function NewCaseSheet({
         }
       }
 
-      if (narrativeResult?.canvas && narrativeResult.canvas.canvas.nodes.length > 0) {
-        applyCanvas(narrativeResult.canvas);
+      const nr = narrativeResult as any;
+      const extractedNodes =
+        nr?.snapshot?.canvas?.nodes ||
+        nr?.canvas?.nodes ||
+        nr?.canvas?.canvas?.nodes;
+
+      if (extractedNodes && Array.isArray(extractedNodes) && extractedNodes.length > 0) {
+        const targetSnapshot: CanvasSnapshot = nr?.snapshot || {
+          caseId: created.id,
+          version: nr?.version || 2,
+          updatedAt: new Date().toISOString(),
+          canvas: nr?.canvas?.nodes
+            ? nr.canvas
+            : nr?.canvas?.canvas || { nodes: extractedNodes, edges: [] },
+        };
+        applyCanvas(targetSnapshot);
       } else {
         const fallbackCanvas = await geminiService.generateCanvasFromNarrative(
           created.id,

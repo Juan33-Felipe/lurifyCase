@@ -339,7 +339,8 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
 
   const report = audit.data;
   const outdated = Boolean(report && canvas.data && report.canvasVersion !== canvas.data.version);
-  const canvasEmpty = canvas.data ? canvas.data.canvas.nodes.length === 0 : false;
+  const canvasNodeCount = Array.isArray(canvas.data?.canvas?.nodes) ? canvas.data!.canvas.nodes.length : 0;
+  const canvasEmpty = canvas.data ? canvasNodeCount === 0 : false;
 
   const handleCreateDeadline = async () => {
     if (!deadlineTitle.trim()) {
@@ -463,7 +464,7 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
     });
 
     // 3. Elementos cronológicos del caso (Hechos, Pruebas, Leyes, Jurisprudencia)
-    const nodes = canvas.data?.canvas.nodes ?? [];
+    const nodes = Array.isArray(canvas.data?.canvas?.nodes) ? canvas.data.canvas.nodes : [];
     const canvasTime = canvas.data
       ? formatTime(canvas.data.updatedAt)
       : formatTime(selectedCase.updatedAt);
@@ -483,7 +484,7 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
         variant: makeActive ? 'active' : 'inactive',
         title: `${t(labelKeys.nodeType(node.type))} • ${node.title}`,
         timestamp: canvasTime,
-        description: node.content,
+        description: node.content || (node as any).summary || '',
         badges: [
           typeBadge,
           node.origin === 'AI_GENERATED' ? 'AI' : 'JD',
@@ -578,7 +579,7 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                       ? t('audit.emptyCanvas')
                       : outdated
                         ? t('audit.outdated')
-                        : `${canvas.data?.canvas.nodes.length ?? 0} ${t('common.elements')} • ${t('common.version')} ${selectedCase.canvasVersion}`}
+                        : `${canvasNodeCount} ${t('common.elements')} • ${t('common.version')} ${selectedCase.canvasVersion}`}
                   </Text>
                 </View>
 

@@ -219,7 +219,10 @@ public class GeminiAdapter implements IAClient {
             node.put("id", nodeId);
             node.put("type", nodeType);
             node.put("title", title);
+            node.put("content", sentence);
             node.put("summary", sentence);
+            node.put("origin", "AI_GENERATED");
+            node.put("userModified", false);
             node.put("position", position);
             node.put("confidence", 0.91);
             node.put("tags", List.of("ai-extracted", nodeType.toLowerCase()));

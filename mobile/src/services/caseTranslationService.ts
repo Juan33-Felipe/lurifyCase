@@ -427,10 +427,11 @@ export function translateCases(cases: Case[], targetLang: Language): Case[] {
 export function translateCanvas(snapshot: CanvasSnapshot, targetLang: Language): CanvasSnapshot {
   if (!snapshot || !snapshot.canvas) return snapshot;
 
-  const translatedNodes: CanvasNode[] = snapshot.canvas.nodes.map((node) => ({
+  const rawNodes = Array.isArray(snapshot.canvas.nodes) ? snapshot.canvas.nodes : [];
+  const translatedNodes: CanvasNode[] = rawNodes.map((node) => ({
     ...node,
+    content: node.content || (node as any).summary || '',
     title: translateText(node.title, targetLang),
-    content: translateText(node.content, targetLang),
   }));
 
   return {
@@ -438,6 +439,7 @@ export function translateCanvas(snapshot: CanvasSnapshot, targetLang: Language):
     canvas: {
       ...snapshot.canvas,
       nodes: translatedNodes,
+      edges: Array.isArray(snapshot.canvas.edges) ? snapshot.canvas.edges : [],
     },
   };
 }
@@ -446,7 +448,7 @@ export function translateCanvas(snapshot: CanvasSnapshot, targetLang: Language):
  * Returns a translated AuditReport for UI presentation.
  */
 export function translateAudit(report: AuditReport, targetLang: Language): AuditReport {
-  if (!report || !report.alerts) return report;
+  if (!report || !Array.isArray(report.alerts)) return report;
 
   const translatedAlerts: AuditAlert[] = report.alerts.map((alert) => ({
     ...alert,

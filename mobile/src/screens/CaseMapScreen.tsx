@@ -107,7 +107,7 @@ function AppleNodeCard({
           numberOfLines={active ? undefined : 2}
           style={styles.nodeContent}
         >
-          {node.content}
+          {node.content || (node as any).summary || ''}
         </Text>
 
         {/* Relaciones con otros elementos cuando está desplegado */}
@@ -169,22 +169,27 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
   const [sendError, setSendError] = useState(false);
 
   const graph = canvas.data?.canvas;
+  const rawNodes = useMemo(
+    () => (Array.isArray(graph?.nodes) ? graph.nodes : []),
+    [graph]
+  );
   const nodes = useMemo(
-    () => (graph?.nodes ?? []).filter((n) => filter === 'ALL' || n.type === filter),
-    [graph, filter]
+    () => rawNodes.filter((n) => filter === 'ALL' || n.type === filter),
+    [rawNodes, filter]
   );
 
-  const selectedNode: CanvasNode | undefined = graph?.nodes.find((n) => n.id === selectedNodeId);
+  const selectedNode: CanvasNode | undefined = rawNodes.find((n) => n.id === selectedNodeId);
   const relations = useMemo(() => {
     if (!graph || !selectedNode) return [];
-    return graph.edges
+    const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
+    return rawEdges
       .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
       .map((e) => {
         const outgoing = e.source === selectedNode.id;
-        const other = graph.nodes.find((n) => n.id === (outgoing ? e.target : e.source));
+        const other = rawNodes.find((n) => n.id === (outgoing ? e.target : e.source));
         return { id: e.id, outgoing, type: e.relationshipType, other };
       });
-  }, [graph, selectedNode]);
+  }, [graph, selectedNode, rawNodes]);
 
   const send = async () => {
     if (!selectedCase || !narrative.trim()) return;
@@ -336,7 +341,7 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
             ) : (
               <>
                 {/* Lista de Elementos Procesales */}
-                {graph && graph.nodes.length > 0 ? (
+                {rawNodes.length > 0 ? (
                   nodes.length === 0 ? (
                     <View style={[styles.emptyFilterCard, { backgroundColor: palette.surface }]}>
                       <Symbol name="search" size={24} color={palette.secondaryLabel} />

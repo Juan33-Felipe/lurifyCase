@@ -204,7 +204,7 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
             prev.caseId === selectedId &&
             prev.snapshot &&
             (prev.snapshot.version > snapshot.version ||
-              prev.snapshot.canvas.nodes.length > snapshot.canvas.nodes.length)
+              (prev.snapshot.canvas?.nodes?.length ?? 0) > (snapshot.canvas?.nodes?.length ?? 0))
           ) {
             return prev;
           }
@@ -213,10 +213,20 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         if (!active) return;
+        // Fallback a un canvas seguro para que el usuario nunca quede atrapado en el spinner de carga
         setCanvasState((prev) =>
           prev && prev.caseId === selectedId && prev.snapshot
             ? prev
-            : { caseId: selectedId, snapshot: null, error: true }
+            : {
+                caseId: selectedId,
+                snapshot: {
+                  caseId: selectedId,
+                  version: 1,
+                  updatedAt: new Date().toISOString(),
+                  canvas: { nodes: [], edges: [] },
+                },
+                error: false,
+              }
         );
       });
     return () => {
@@ -227,6 +237,11 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   const reloadCanvas = useCallback(() => {
     setCanvasState(null);
     setReloadTick((n) => n + 1);
+  }, []);
+
+  const selectCase = useCallback((id: string) => {
+    setSelectedId(id);
+    setReloadTick((t) => t + 1);
   }, []);
 
   const canvasCurrent = canvasState && canvasState.caseId === selectedId ? canvasState : null;
@@ -243,7 +258,19 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     async (payload: CreateCaseRequest) => {
       const created = await caseService.createCase(payload);
       const withUser: Case = userId && !created.userId ? { ...created, userId } : created;
-      setCases((p) => ({ ...p, data: [withUser, ...(p.data ?? [])] }));
+      const initialSnapshot: CanvasSnapshot = {
+        caseId: withUser.id,
+        version: 1,
+        updatedAt: withUser.createdAt || new Date().toISOString(),
+        canvas: { nodes: [], edges: [] },
+      };
+      setCases((p) => ({
+        ...p,
+        data: [withUser, ...(p.data ?? [])],
+        loading: false,
+        error: false,
+      }));
+      setCanvasState({ caseId: withUser.id, snapshot: initialSnapshot, error: false });
       setSelectedId(withUser.id);
       return withUser;
     },
@@ -318,7 +345,7 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     refreshCases,
     createCase,
     selectedCase: displaySelectedCase,
-    selectCase: setSelectedId,
+    selectCase,
     canvas: displayCanvas,
     reloadCanvas,
     applyCanvas,

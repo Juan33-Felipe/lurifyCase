@@ -225,7 +225,7 @@ export default function DashboardScreen({
     });
 
     const alerts = audit.data?.alerts ?? [];
-    const nodes = canvas.data?.canvas.nodes ?? [];
+    const nodes = Array.isArray(canvas.data?.canvas?.nodes) ? canvas.data.canvas.nodes : [];
 
     // 1. Alertas de auditoría IA
     alerts.forEach((alert) => {
