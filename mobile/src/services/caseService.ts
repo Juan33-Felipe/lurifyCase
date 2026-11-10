@@ -30,8 +30,14 @@ export const caseService = {
    * Ejecuta la auditoria IA sobre una version del canvas.
    */
   auditCase: async (caseId: string, canvasVersion: number): Promise<AuditReport> => {
-    const response = await apiClient.post<AuditReport>(`/cases/${caseId}/audit`, { canvasVersion });
-    return response.data;
+    const response = await apiClient.post<any>(`/cases/${caseId}/audit`, { canvasVersion });
+    const data = response.data;
+    const generatedAt =
+      data?.generatedAt || data?.auditedAt || data?.createdAt || new Date().toISOString();
+    return {
+      ...data,
+      generatedAt,
+    };
   },
 
   /**
