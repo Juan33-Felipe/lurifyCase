@@ -60,34 +60,49 @@ const EXACT_TRANSLATIONS_EN_TO_ES: Record<string, string> = {
 
   // AI Audit Engine Findings & Canonical Alerts
   'Missing Statutory or Jurisprudential Anchor': 'Falta de fundamento legal o jurisprudencial',
+  'The docket contains facts and evidence but lacks statutory provisions or case precedent anchoring the legal theory.':
+    'El expediente contiene hechos y pruebas pero carece de disposiciones legales o jurisprudencia que sustenten jurídicamente la pretensión.',
   'The canvas contains factual/evidentiary elements but no LAW or JURISPRUDENCE nodes anchoring the legal theory.':
-    'El lienzo contiene elementos fácticos/probatorios pero ningún nodo de LEY o JURISPRUDENCIA que sustente la teoría del caso.',
+    'El expediente contiene elementos fácticos y probatorios pero carece de disposiciones legales o jurisprudencia que sustenten la teoría del caso.',
+  'Incorporate applicable statutory provisions or binding judicial precedents supporting the claim.':
+    'Incorporar las disposiciones normativas aplicables o precedentes vinculantes pertinentes a la pretensión.',
   'Add applicable statutory provisions (LAW) or binding case precedent (JURISPRUDENCE) connected via APPLIES_TO or CITES edges.':
-    'Agregar disposiciones normativas aplicables (LEY) o precedentes vinculantes (JURISPRUDENCIA) conectados mediante relaciones APLICA_A o CITA.',
+    'Agregar disposiciones normativas aplicables o precedentes vinculantes pertinentes para fundamentar la pretensión.',
 
   'Direct Evidentiary Contradiction Detected': 'Contradicción probatoria directa detectada',
+  'A direct contradiction exists between elements of the docket, creating an adversarial vulnerability during cross-examination.':
+    'Existe una contradicción directa entre elementos probatorios del expediente, lo que genera una alta vulnerabilidad ante el contrainterrogatorio o la contestación de la contraparte.',
   'A CONTRADICTS relationship exists between nodes on the canvas, creating an adversarial vulnerability during cross-examination.':
-    'Existe una relación de CONTRADICCIÓN entre nodos del lienzo, lo que genera una vulnerabilidad frente al contrainterrogatorio.',
+    'Existe una contradicción directa entre elementos probatorios del expediente, lo que genera una alta vulnerabilidad ante el contrainterrogatorio o la contestación de la contraparte.',
+  'Prepare impeachment rebuttal or corroborate the contested fact with independent documentary evidence.':
+    'Preparar refutación de tacha o impugnación, o corroborar el hecho controvertido con prueba documental independiente.',
   'Prepare impeachment rebuttal or corroborate the contested node with independent documentary evidence.':
-    'Preparar refutación de impugnación o corroborar el nodo controvertido con prueba documental independiente.',
+    'Preparar refutación de tacha o impugnación, o corroborar el hecho controvertido con prueba documental independiente.',
 
-  'Empty Case Strategy Canvas': 'Lienzo de estrategia del caso vacío',
+  'Docket Lacks Registered Facts and Evidence': 'Expediente sin hechos ni elementos probatorios registrados',
+  'Empty Case Strategy Canvas': 'Expediente sin hechos ni elementos probatorios registrados',
+  'The docket currently contains no narrated facts, evidentiary elements, or statutory anchors supporting a theory of the case.':
+    'El expediente actualmente no contiene hechos narrados, elementos probatorios ni fundamentación jurídica que sustenten una teoría del caso.',
   'The legal canvas currently contains no factual, evidentiary, or statutory nodes.':
-    'El lienzo jurídico actualmente no contiene nodos fácticos, probatorios ni normativos.',
+    'El expediente actualmente no contiene hechos narrados, elementos probatorios ni fundamentación jurídica que sustenten una teoría del caso.',
+  'Ingest the factual case narrative and attach initial evidentiary records before proceeding to trial preparation.':
+    'Ingresar el relato fáctico del caso y registrar los medios probatorios iniciales antes de proceder a la preparación del juicio.',
   'Ingest a case narrative or add initial FACT and EVIDENCE nodes before proceeding to trial preparation.':
-    'Ingresar una narrativa del caso o agregar nodos iniciales de HECHO y PRUEBA antes de proceder a la preparación del juicio.',
+    'Ingresar el relato fáctico del caso y registrar los medios probatorios iniciales antes de proceder a la preparación del juicio.',
 
   'Strategically Grounded Case Architecture': 'Arquitectura del caso estratégicamente sustentada',
   'All factual claims are corroborated by evidentiary nodes and anchored to governing legal authority.':
-    'Todas las afirmaciones fácticas están corroboradas por nodos probatorios y ancladas a la normativa legal aplicable.',
+    'Todas las afirmaciones fácticas están corroboradas por medios probatorios y ancladas a la normativa legal aplicable.',
   'Proceed to generate trial briefs or evidentiary disclosure documents with high strategic confidence.':
     'Proceder a generar escritos procesales o documentos de revelación probatoria con alta confianza estratégica.',
 
-  'Legal Vulnerability': 'Vulnerabilidad jurídica',
-  'Detected potential issue in case graph.': 'Se detectó un problema potencial en el grafo del caso.',
-  'Review supporting evidence and statutory basis.': 'Revisar el sustento probatorio y el fundamento legal.',
+  'Legal Vulnerability': 'Vulnerabilidad jurídica procesal',
+  'Detected potential issue in case graph.': 'Se detectó una potencial vulnerabilidad procesal en el expediente.',
+  'Review supporting evidence and statutory basis.': 'Revisar el sustento probatorio y el fundamento de derecho.',
   'Critical structural gap: the canvas has no nodes to support a legal theory.':
-    'Vacío estructural crítico: el lienzo no tiene nodos que sustenten una teoría del caso.',
+    'Vacío procesal crítico: el expediente no cuenta con elementos fácticos ni probatorios para sustentar la teoría del caso.',
+  'Critical procedural gap: the docket has no factual or evidentiary elements to support a theory of the case.':
+    'Vacío procesal crítico: el expediente no cuenta con elementos fácticos ni probatorios para sustentar la teoría del caso.',
 
   // Canvas Nodes & Inferred Premises
   'Derived Factual Premise': 'Premisa fáctica derivada',
@@ -109,36 +124,58 @@ const EXACT_TRANSLATIONS_ES_TO_EN: Record<string, string> = Object.entries(
 // High-frequency legal glossary rules (EN -> ES) sorted by length descending
 const PHRASE_RULES_EN_TO_ES: [RegExp, string][] = [
   // AI Audit Engine Findings & Vulnerabilities
-  [/\bUncorroborated Factual Assertions\s*(\(\d+\))?/gi, 'Aseveraciones fácticas sin corroborar $1'],
-  [/\bUncorroborated Factual Assertion\b/gi, 'Aseveración fáctica sin corroborar'],
+  [/\bUncorroborated Factual Assertions\s*(\(\d+\))?/gi, 'Aseveraciones fácticas sin sustento probatorio $1'],
+  [/\bUncorroborated Factual Assertion\b/gi, 'Aseveración fáctica sin sustento probatorio'],
+  [/\bOne or more factual assertions lack supporting evidence, leaving key factual claims open to challenge\.?/gi,
+    'Uno o más hechos alegados carecen de medios probatorios que los respalden, lo que deja expuestas a impugnación afirmaciones fácticas determinantes.'],
   [/\bOne or more FACT nodes lack an incoming SUPPORTS link from an? (?:EVIDENCE|pruebas) node, leaving key factual assertions open to challenge\.?/gi,
-    'Uno o más nodos de HECHO carecen de un enlace de SOPORTE entrante desde un nodo de PRUEBA, lo que deja abiertas a impugnación aseveraciones fácticas clave.'],
+    'Uno o más hechos alegados carecen de medios probatorios que los respalden, lo que deja expuestas a impugnación afirmaciones fácticas determinantes.'],
+  [/\bAttach documentary, testimonial, or expert evidence to each uncorroborated factual claim\.?/gi,
+    'Vincular medios de prueba documentales, testimoniales o periciales a cada hecho alegado no corroborado.'],
   [/\bLink documentary, testimonial, or expert (?:EVIDENCE|pruebas) nodes to each uncorroborated FACT node\.?/gi,
-    'Vincular nodos de PRUEBA documentales, testimoniales o periciales a cada nodo de HECHO no corroborado.'],
+    'Vincular medios de prueba documentales, testimoniales o periciales a cada hecho alegado no corroborado.'],
   [/\bMissing Statutory or Jurisprudential Anchor\b/gi, 'Falta de fundamento legal o jurisprudencial'],
   [/\bMissing Statutory or Jurisprudentia\.\.\./gi, 'Falta de fundamento legal o jurisprudencial...'],
+  [/\bThe docket contains facts and evidence but lacks statutory provisions or case precedent anchoring the legal theory\.?/gi,
+    'El expediente contiene hechos y pruebas pero carece de disposiciones legales o jurisprudencia que sustenten jurídicamente la pretensión.'],
   [/\bThe canvas contains (?:factual\/evidentiary|factual\/probatorio) elements but no LAW or JURISPRUDENCE nodes anchoring the legal theory\.?/gi,
-    'El lienzo contiene elementos fácticos/probatorios pero ningún nodo de LEY o JURISPRUDENCIA que sustente la teoría del caso.'],
+    'El expediente contiene elementos fácticos y probatorios pero carece de disposiciones legales o jurisprudencia que sustenten la teoría del caso.'],
+  [/\bIncorporate applicable statutory provisions or binding judicial precedents supporting the claim\.?/gi,
+    'Incorporar las disposiciones normativas aplicables o precedentes vinculantes pertinentes a la pretensión.'],
   [/\bAdd applicable statutory provisions \(LAW\) or binding case precedent \(JURISPRUDENCE\) connected via APPLIES_TO or CITES edges\.?/gi,
-    'Agregar disposiciones normativas aplicables (LEY) o precedentes vinculantes (JURISPRUDENCIA) conectados mediante relaciones APLICA_A o CITA.'],
-  [/\bIsolated Canvas Elements\s*(\(\d+\))?/gi, 'Elementos aislados en el lienzo $1'],
+    'Agregar disposiciones normativas aplicables o precedentes vinculantes pertinentes para fundamentar la pretensión.'],
+  [/\bElements Disconnected from Case Theory\s*(\(\d+\))?/gi, 'Alegaciones o pruebas desvinculadas de la teoría del caso $1'],
+  [/\bIsolated Canvas Elements\s*(\(\d+\))?/gi, 'Alegaciones o pruebas desvinculadas de la teoría del caso $1'],
+  [/\bCertain allegations or records are disconnected from the primary factual and evidentiary sequence\.?/gi,
+    'Ciertas alegaciones o elementos se encuentran desvinculados de la secuencia fáctica y de la pretensión jurídica principal.'],
   [/\bCertain nodes are disconnected from the primary causal and evidentiary chain\.?/gi,
-    'Ciertos nodos se encuentran desconectados de la cadena causal y probatoria principal.'],
+    'Ciertas alegaciones o elementos se encuentran desvinculados de la secuencia fáctica y de la pretensión jurídica principal.'],
+  [/\bConnect facts and evidence to the case theory or discard irrelevant assertions\.?/gi,
+    'Vincular los hechos y pruebas a la teoría del caso o descartar elementos impertinentes.'],
   [/\bConnect isolated nodes using SUPPORTS, APPLIES_TO, or TEMPORAL_PRECEDES edges, or remove redundant nodes\.?/gi,
-    'Conectar los nodos aislados usando relaciones de SOPORTE, APLICA_A o SECUENCIA_TEMPORAL, o eliminar nodos redundantes.'],
+    'Vincular los hechos y pruebas a la teoría del caso o descartar elementos impertinentes.'],
   [/\bDirect Evidentiary Contradiction Detected\b/gi, 'Contradicción probatoria directa detectada'],
+  [/\bA direct contradiction exists between elements of the docket, creating an adversarial vulnerability during cross-examination\.?/gi,
+    'Existe una contradicción directa entre elementos probatorios del expediente, lo que genera una alta vulnerabilidad ante el contrainterrogatorio o la contestación de la contraparte.'],
   [/\bA CONTRADICTS relationship exists between nodes on the canvas, creating an adversarial vulnerability during cross-examination\.?/gi,
-    'Existe una relación de CONTRADICCIÓN entre nodos del lienzo, lo que genera una vulnerabilidad frente al contrainterrogatorio.'],
+    'Existe una contradicción directa entre elementos probatorios del expediente, lo que genera una alta vulnerabilidad ante el contrainterrogatorio o la contestación de la contraparte.'],
+  [/\bPrepare impeachment rebuttal or corroborate the contested fact with independent documentary evidence\.?/gi,
+    'Preparar refutación de tacha o impugnación, o corroborar el hecho controvertido con prueba documental independiente.'],
   [/\bPrepare impeachment rebuttal or corroborate the contested node with independent documentary evidence\.?/gi,
-    'Preparar refutación de impugnación o corroborar el nodo controvertido con prueba documental independiente.'],
-  [/\bEmpty Case Strategy Canvas\b/gi, 'Lienzo de estrategia del caso vacío'],
+    'Preparar refutación de tacha o impugnación, o corroborar el hecho controvertido con prueba documental independiente.'],
+  [/\bDocket Lacks Registered Facts and Evidence\b/gi, 'Expediente sin hechos ni elementos probatorios registrados'],
+  [/\bEmpty Case Strategy Canvas\b/gi, 'Expediente sin hechos ni elementos probatorios registrados'],
+  [/\bThe docket currently contains no narrated facts, evidentiary elements, or statutory anchors supporting a theory of the case\.?/gi,
+    'El expediente actualmente no contiene hechos narrados, elementos probatorios ni fundamentación jurídica que sustenten una teoría del caso.'],
   [/\bThe legal canvas currently contains no (?:factual, evidentiary, or statutory|fácticos, probatorios ni normativos) nodes\.?/gi,
-    'El lienzo jurídico actualmente no contiene nodos fácticos, probatorios ni normativos.'],
+    'El expediente actualmente no contiene hechos narrados, elementos probatorios ni fundamentación jurídica que sustenten una teoría del caso.'],
+  [/\bIngest the factual case narrative and attach initial evidentiary records before proceeding to trial preparation\.?/gi,
+    'Ingresar el relato fáctico del caso y registrar los medios probatorios iniciales antes de proceder a la preparación del juicio.'],
   [/\bIngest a case narrative or add initial FACT and EVIDENCE nodes before proceeding to trial preparation\.?/gi,
-    'Ingresar una narrativa del caso o agregar nodos iniciales de HECHO y PRUEBA antes de proceder a la preparación del juicio.'],
+    'Ingresar el relato fáctico del caso y registrar los medios probatorios iniciales antes de proceder a la preparación del juicio.'],
   [/\bStrategically Grounded Case Architecture\b/gi, 'Arquitectura del caso estratégicamente sustentada'],
   [/\bAll factual claims are corroborated by evidentiary nodes and anchored to governing legal authority\.?/gi,
-    'Todas las afirmaciones fácticas están corroboradas por nodos probatorios y ancladas a la normativa legal aplicable.'],
+    'Todas las afirmaciones fácticas están corroboradas por medios probatorios y ancladas a la normativa legal aplicable.'],
   [/\bProceed to generate trial briefs or evidentiary disclosure documents with high strategic confidence\.?/gi,
     'Proceder a generar escritos procesales o documentos de revelación probatoria con alta confianza estratégica.'],
   [/\bInferred companion element from narrative:\s*/gi, 'Elemento complementario inferido de la narrativa: '],
@@ -275,35 +312,61 @@ const PHRASE_RULES_EN_TO_ES: [RegExp, string][] = [
 
 // High-frequency reverse rules (ES -> EN)
 const PHRASE_RULES_ES_TO_EN: [RegExp, string][] = [
+  [/\bAseveraciones fácticas sin sustento probatorio\s*(\(\d+\))?/gi, 'Uncorroborated Factual Assertions $1'],
+  [/\bAseveración fáctica sin sustento probatorio\b/gi, 'Uncorroborated Factual Assertion'],
   [/\bAseveraciones fácticas sin corroborar\s*(\(\d+\))?/gi, 'Uncorroborated Factual Assertions $1'],
   [/\bAseveración fáctica sin corroborar\b/gi, 'Uncorroborated Factual Assertion'],
+  [/\bUno o más hechos alegados carecen de medios probatorios que los respalden, lo que deja expuestas a impugnación afirmaciones fácticas determinantes\.?/gi,
+    'One or more factual assertions lack supporting evidence, leaving key factual claims open to challenge.'],
   [/\bUno o más nodos de HECHO carecen de un enlace de SOPORTE entrante desde un nodo de PRUEBA, lo que deja abiertas a impugnación aseveraciones fácticas clave\.?/gi,
-    'One or more FACT nodes lack an incoming SUPPORTS link from an EVIDENCE node, leaving key factual assertions open to challenge.'],
+    'One or more factual assertions lack supporting evidence, leaving key factual claims open to challenge.'],
+  [/\bVincular medios de prueba documentales, testimoniales o periciales a cada hecho alegado no corroborado\.?/gi,
+    'Attach documentary, testimonial, or expert evidence to each uncorroborated factual claim.'],
   [/\bVincular nodos de PRUEBA documentales, testimoniales o periciales a cada nodo de HECHO no corroborado\.?/gi,
-    'Link documentary, testimonial, or expert EVIDENCE nodes to each uncorroborated FACT node.'],
+    'Attach documentary, testimonial, or expert evidence to each uncorroborated factual claim.'],
   [/\bFalta de fundamento legal o jurisprudencial\b/gi, 'Missing Statutory or Jurisprudential Anchor'],
+  [/\bEl expediente contiene hechos y pruebas pero carece de disposiciones legales o jurisprudencia que sustenten jurídicamente la pretensión\.?/gi,
+    'The docket contains facts and evidence but lacks statutory provisions or case precedent anchoring the legal theory.'],
   [/\bEl lienzo contiene elementos fácticos\/probatorios pero ningún nodo de LEY o JURISPRUDENCIA que sustente la teoría del caso\.?/gi,
-    'The canvas contains factual/evidentiary elements but no LAW or JURISPRUDENCE nodes anchoring the legal theory.'],
+    'The docket contains facts and evidence but lacks statutory provisions or case precedent anchoring the legal theory.'],
+  [/\bIncorporar las disposiciones normativas aplicables o precedentes vinculantes pertinentes a la pretensión\.?/gi,
+    'Incorporate applicable statutory provisions or binding judicial precedents supporting the claim.'],
   [/\bAgregar disposiciones normativas aplicables \(LEY\) o precedentes vinculantes \(JURISPRUDENCIA\) conectados mediante relaciones APLICA_A o CITA\.?/gi,
-    'Add applicable statutory provisions (LAW) or binding case precedent (JURISPRUDENCE) connected via APPLIES_TO or CITES edges.'],
-  [/\bElementos aislados en el lienzo\s*(\(\d+\))?/gi, 'Isolated Canvas Elements $1'],
+    'Incorporate applicable statutory provisions or binding judicial precedents supporting the claim.'],
+  [/\bAlegaciones o pruebas desvinculadas de la teoría del caso\s*(\(\d+\))?/gi, 'Elements Disconnected from Case Theory $1'],
+  [/\bElementos aislados en el lienzo\s*(\(\d+\))?/gi, 'Elements Disconnected from Case Theory $1'],
+  [/\bCiertas alegaciones o elementos se encuentran desvinculados de la secuencia fáctica y de la pretensión jurídica principal\.?/gi,
+    'Certain allegations or records are disconnected from the primary factual and evidentiary sequence.'],
   [/\bCiertos nodos se encuentran desconectados de la cadena causal y probatoria principal\.?/gi,
-    'Certain nodes are disconnected from the primary causal and evidentiary chain.'],
+    'Certain allegations or records are disconnected from the primary factual and evidentiary sequence.'],
+  [/\bVincular los hechos y pruebas a la teoría del caso o descartar elementos impertinentes\.?/gi,
+    'Connect facts and evidence to the case theory or discard irrelevant assertions.'],
   [/\bConectar los nodos aislados usando relaciones de SOPORTE, APLICA_A o SECUENCIA_TEMPORAL, o eliminar nodos redundantes\.?/gi,
-    'Connect isolated nodes using SUPPORTS, APPLIES_TO, or TEMPORAL_PRECEDES edges, or remove redundant nodes.'],
+    'Connect facts and evidence to the case theory or discard irrelevant assertions.'],
   [/\bContradicción probatoria directa detectada\b/gi, 'Direct Evidentiary Contradiction Detected'],
+  [/\bExiste una contradicción directa entre elementos probatorios del expediente, lo que genera una alta vulnerabilidad ante el contrainterrogatorio o la contestación de la contraparte\.?/gi,
+    'A direct contradiction exists between elements of the docket, creating an adversarial vulnerability during cross-examination.'],
   [/\bExiste una relación de CONTRADICCIÓN entre nodos del lienzo, lo que genera una vulnerabilidad frente al contrainterrogatorio\.?/gi,
-    'A CONTRADICTS relationship exists between nodes on the canvas, creating an adversarial vulnerability during cross-examination.'],
+    'A direct contradiction exists between elements of the docket, creating an adversarial vulnerability during cross-examination.'],
+  [/\bPreparar refutación de tacha o impugnación, o corroborar el hecho controvertido con prueba documental independiente\.?/gi,
+    'Prepare impeachment rebuttal or corroborate the contested fact with independent documentary evidence.'],
   [/\bPreparar refutación de impugnación o corroborar el nodo controvertido con prueba documental independiente\.?/gi,
-    'Prepare impeachment rebuttal or corroborate the contested node with independent documentary evidence.'],
-  [/\bLienzo de estrategia del caso vacío\b/gi, 'Empty Case Strategy Canvas'],
+    'Prepare impeachment rebuttal or corroborate the contested fact with independent documentary evidence.'],
+  [/\bExpediente sin hechos ni elementos probatorios registrados\b/gi, 'Docket Lacks Registered Facts and Evidence'],
+  [/\bLienzo de estrategia del caso vacío\b/gi, 'Docket Lacks Registered Facts and Evidence'],
+  [/\bEl expediente actualmente no contiene hechos narrados, elementos probatorios ni fundamentación jurídica que sustenten una teoría del caso\.?/gi,
+    'The docket currently contains no narrated facts, evidentiary elements, or statutory anchors supporting a theory of the case.'],
   [/\bEl lienzo jurídico actualmente no contiene nodos fácticos, probatorios ni normativos\.?/gi,
-    'The legal canvas currently contains no factual, evidentiary, or statutory nodes.'],
+    'The docket currently contains no narrated facts, evidentiary elements, or statutory anchors supporting a theory of the case.'],
+  [/\bIngresar el relato fáctico del caso y registrar los medios probatorios iniciales antes de proceder a la preparación del juicio\.?/gi,
+    'Ingest the factual case narrative and attach initial evidentiary records before proceeding to trial preparation.'],
   [/\bIngresar una narrativa del caso o agregar nodos iniciales de HECHO y PRUEBA antes de proceder a la preparación del juicio\.?/gi,
-    'Ingest a case narrative or add initial FACT and EVIDENCE nodes before proceeding to trial preparation.'],
+    'Ingest the factual case narrative and attach initial evidentiary records before proceeding to trial preparation.'],
   [/\bArquitectura del caso estratégicamente sustentada\b/gi, 'Strategically Grounded Case Architecture'],
+  [/\bTodas las afirmaciones fácticas están corroboradas por medios probatorios y ancladas a la normativa legal aplicable\.?/gi,
+    'All factual claims are corroborated by evidentiary elements and anchored to governing legal authority.'],
   [/\bTodas las afirmaciones fácticas están corroboradas por nodos probatorios y ancladas a la normativa legal aplicable\.?/gi,
-    'All factual claims are corroborated by evidentiary nodes and anchored to governing legal authority.'],
+    'All factual claims are corroborated by evidentiary elements and anchored to governing legal authority.'],
   [/\bProceder a generar escritos procesales o documentos de revelación probatoria con alta confianza estratégica\.?/gi,
     'Proceed to generate trial briefs or evidentiary disclosure documents with high strategic confidence.'],
   [/\bElemento complementario inferido de la narrativa:\s*/gi, 'Inferred companion element from narrative: '],
@@ -445,6 +508,38 @@ export function translateCanvas(snapshot: CanvasSnapshot, targetLang: Language):
 }
 
 /**
+ * Sanitizes any residual graph terminology into proper procedural legal terms.
+ */
+export function sanitizeLegalText(text?: string | null): string {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/\bnodos?\s+de\s+hechos?\b/gi, 'hechos alegados')
+    .replace(/\bnodos?\s+fácticos?\b/gi, 'elementos fácticos')
+    .replace(/\bnodos?\s+probatorios?\b/gi, 'elementos probatorios')
+    .replace(/\bnodos?\s+de\s+pruebas?\b/gi, 'medios probatorios')
+    .replace(/\bnodos?\s+de\s+ley\b/gi, 'fundamentos de derecho')
+    .replace(/\bnodos?\s+normativos?\b/gi, 'fundamentos normativos')
+    .replace(/\bnodos?\s+de\s+jurisprudencia\b/gi, 'precedentes jurisprudenciales')
+    .replace(/\bnodos?\s+aislados?\b/gi, 'elementos desvinculados')
+    .replace(/\bfact\s+nodes?\b/gi, 'factual assertions')
+    .replace(/\bevidence\s+nodes?\b/gi, 'evidentiary items')
+    .replace(/\blaw\s+nodes?\b/gi, 'statutory authorities')
+    .replace(/\bjurisprudence\s+nodes?\b/gi, 'judicial precedents')
+    .replace(/\bisolated\s+nodes?\b/gi, 'unlinked elements')
+    .replace(/\bnodos\b/gi, 'elementos del expediente')
+    .replace(/\bnodo\b/gi, 'elemento procesal')
+    .replace(/\baristas\b/gi, 'vinculaciones procesales')
+    .replace(/\barista\b/gi, 'vínculo procesal')
+    .replace(/\bgrafos?\b/gi, 'expediente')
+    .replace(/\bvértices?\b/gi, 'elementos del caso')
+    .replace(/\blienzo\b/gi, 'expediente')
+    .replace(/\bnodes\b/gi, 'case elements')
+    .replace(/\bnode\b/gi, 'case element')
+    .replace(/\bedges\b/gi, 'evidentiary links')
+    .replace(/\bedge\b/gi, 'evidentiary link');
+}
+
+/**
  * Returns a translated AuditReport for UI presentation.
  */
 export function translateAudit(report: AuditReport, targetLang: Language): AuditReport {
@@ -452,10 +547,10 @@ export function translateAudit(report: AuditReport, targetLang: Language): Audit
 
   const translatedAlerts: AuditAlert[] = report.alerts.map((alert) => ({
     ...alert,
-    title: translateText(alert.title, targetLang),
-    description: translateText(alert.description, targetLang),
+    title: sanitizeLegalText(translateText(alert.title, targetLang)),
+    description: sanitizeLegalText(translateText(alert.description, targetLang)),
     recommendation: alert.recommendation
-      ? translateText(alert.recommendation, targetLang)
+      ? sanitizeLegalText(translateText(alert.recommendation, targetLang))
       : undefined,
   }));
 

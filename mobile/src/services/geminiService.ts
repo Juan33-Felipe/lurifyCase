@@ -10,7 +10,7 @@ const GEMINI_API_KEY =
   process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 
 const GEMINI_MODEL =
-  process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.5-flash';
+  process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.8-flash';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -130,14 +130,18 @@ class GeminiService {
    * Executes adversarial legal audit on provided case facts and evidence.
    */
   async runAudit(caseContext: string): Promise<GeminiAuditResult> {
-    const systemPrompt = `You are an Adversarial Senior Legal Auditor AI for Iurify Case.
-Analyze the legal scenario and return JSON with:
+    const systemPrompt = `Eres un Auditor Jurídico Procesal Adversarial Senior para Iurify Case.
+Realiza una auditoría procesal exhaustiva del caso analizando hechos, medios probatorios y fundamentos de derecho.
+REGLA ESTRICTA: NUNCA utilices términos técnicos de grafos como "nodo", "nodos", "node", "nodes", "grafo", "arista", "edge".
+Utiliza siempre lenguaje forense procesal: "hecho alegado", "medios probatorios", "fundamentos de derecho", "teoría del caso", "vulnerabilidad procesal".
+
+Return JSON with:
 {
   "solidityScore": 0-100,
   "summary": "...",
   "alerts": [
     {
-      "type": "EVIDENCE_CONFLICT|PROCEDURAL_GAP|UNSUPPORTED_FACT",
+      "type": "EVIDENCE_CONFLICT|PROCEDURAL_GAP|UNSUPPORTED_FACT|MISSING_LEGAL_BASIS|CASE_THEORY_WEAKNESS",
       "severity": "HIGH|MEDIUM|LOW",
       "title": "...",
       "description": "...",
@@ -168,7 +172,37 @@ Analyze the legal scenario and return JSON with:
 
     const json = await response.json();
     const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return JSON.parse(rawText) as GeminiAuditResult;
+    const parsed = JSON.parse(rawText) as GeminiAuditResult;
+
+    const sanitize = (s: string) =>
+      s
+        .replace(/\bnodos?\s+de\s+hechos?\b/gi, 'hechos alegados')
+        .replace(/\bnodos?\s+probatorios?\b/gi, 'elementos probatorios')
+        .replace(/\bnodos?\s+de\s+pruebas?\b/gi, 'medios probatorios')
+        .replace(/\bnodos?\s+de\s+ley\b/gi, 'fundamentos de derecho')
+        .replace(/\bnodos?\s+aislados?\b/gi, 'elementos desvinculados')
+        .replace(/\bnodos\b/gi, 'elementos del expediente')
+        .replace(/\bnodo\b/gi, 'elemento procesal')
+        .replace(/\baristas\b/gi, 'vinculaciones procesales')
+        .replace(/\barista\b/gi, 'vínculo procesal')
+        .replace(/\bgrafos?\b/gi, 'expediente')
+        .replace(/\blienzo\b/gi, 'expediente')
+        .replace(/\bnodes\b/gi, 'case elements')
+        .replace(/\bnode\b/gi, 'case element');
+
+    return {
+      solidityScore: parsed.solidityScore ?? 75,
+      summary: sanitize(parsed.summary || ''),
+      alerts: Array.isArray(parsed.alerts)
+        ? parsed.alerts.map((a) => ({
+            type: a.type || 'PROCEDURAL_GAP',
+            severity: a.severity || 'MEDIUM',
+            title: sanitize(a.title || ''),
+            description: sanitize(a.description || ''),
+            recommendation: sanitize(a.recommendation || ''),
+          }))
+        : [],
+    };
   }
 
   /**
