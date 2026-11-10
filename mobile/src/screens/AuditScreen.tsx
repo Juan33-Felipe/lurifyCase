@@ -647,14 +647,15 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                     >
                       <Symbol name="calendar" size={17} color={palette.label} />
                     </View>
-                    <View>
-                      <Text variant="title2" weight="700">
+                    <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                      <Text variant="title2" weight="700" numberOfLines={1}>
                         {t('audit.deadline.sectionTitle')}
                       </Text>
                       {deadlines.length > 0 ? (
                         <Text
                           variant="caption"
                           color={palette.secondaryLabel}
+                          numberOfLines={1}
                           style={{ marginTop: 1 }}
                         >
                           {deadlines.filter((d) => !d.completed).length} {t('tasks.title').toLowerCase()} • {deadlines.length} total
@@ -1088,13 +1089,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 12,
   },
   sectionTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   sectionIconCircle: {
     width: 36,
