@@ -25,7 +25,7 @@ import {
   usePalette,
   usePressFeedback,
 } from '../components/apple';
-import { Tab, labelKeys } from '../components/ui';
+import { Tab, formatShortDate, formatYMD, labelKeys } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useCases } from '../context/CasesContext';
 import { useSettings } from '../context/SettingsContext';
@@ -161,7 +161,8 @@ export default function DashboardScreen({
   const palette = usePalette();
   const { t, language } = useSettings();
   const { user } = useAuth();
-  const { cases, refreshCases, selectedCase, selectCase, canvas, audit } = useCases();
+  const { cases, refreshCases, selectedCase, selectCase, canvas, audit, deadlines, toggleDeadline } =
+    useCases();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('ALL');
@@ -195,7 +196,33 @@ export default function DashboardScreen({
       statusColor: string;
       defaultChecked?: boolean;
       targetTab: Tab;
+      deadlineId?: string;
     }[] = [];
+
+    // 0. Plazos y Tiempos de Entrega procesales (máxima prioridad)
+    const todayStr = formatYMD(new Date());
+    const locale = language === 'es' ? 'es-ES' : 'en-US';
+    deadlines.forEach((dl) => {
+      const isOverdue = dl.to < todayStr;
+      const isDueToday = dl.to === todayStr;
+      const statusColor = dl.completed
+        ? APPLE_SUCCESS
+        : isOverdue
+          ? palette.danger
+          : isDueToday || dl.priority === 'HIGH'
+            ? APPLE_WARNING
+            : palette.label;
+
+      items.push({
+        id: `deadline-${dl.id}`,
+        title: dl.title,
+        subtitle: `${selectedCase.title} • ${formatShortDate(dl.from, locale)} → ${formatShortDate(dl.to, locale)} (${t('audit.deadline.sectionTitle')})`,
+        statusColor,
+        defaultChecked: dl.completed,
+        targetTab: 'audit',
+        deadlineId: dl.id,
+      });
+    });
 
     const alerts = audit.data?.alerts ?? [];
     const nodes = canvas.data?.canvas.nodes ?? [];
@@ -260,9 +287,12 @@ export default function DashboardScreen({
     }
 
     return items;
-  }, [selectedCase, audit.data, canvas.data, palette, t]);
+  }, [selectedCase, deadlines, language, audit.data, canvas.data, palette, t]);
 
-  const toggleTask = (id: string, defaultChecked?: boolean) => {
+  const toggleTask = (id: string, defaultChecked?: boolean, deadlineId?: string) => {
+    if (deadlineId) {
+      toggleDeadline(deadlineId);
+    }
     setCompletedTaskIds((prev) => ({
       ...prev,
       [id]: !(prev[id] ?? defaultChecked ?? false),
@@ -503,7 +533,7 @@ export default function DashboardScreen({
                         >
                           {/* Casilla circular estilo Recordatorios de iOS */}
                           <Pressable
-                            onPress={() => toggleTask(task.id, task.defaultChecked)}
+                            onPress={() => toggleTask(task.id, task.defaultChecked, task.deadlineId)}
                             hitSlop={12}
                             style={[
                               styles.taskCheckbox,
