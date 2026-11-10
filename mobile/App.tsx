@@ -38,7 +38,7 @@ function Shell() {
   const [newCaseOpen, setNewCaseOpen] = useState(false);
 
   // Top of DashboardScreen has a dark charcoal hero header, so status bar icons are light on 'cases'
-  const statusBarStyle = tab === 'cases' ? 'light' : theme === 'dark' ? 'light' : 'dark';
+  const statusBarStyle = theme === 'dark' ? 'light' : 'dark';
 
   if (status === 'loading') {
     return (
@@ -85,7 +85,7 @@ function Shell() {
         <NewCaseSheet
           visible={newCaseOpen}
           onClose={() => setNewCaseOpen(false)}
-          onCreated={() => setTab('cases')}
+          onCreated={(createdMode) => setTab(createdMode === 'voice' ? 'caseMap' : 'cases')}
         />
       </CasesProvider>
     </GlassBackground>
