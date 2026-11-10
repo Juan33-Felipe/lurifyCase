@@ -1,41 +1,155 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { MaterialIcons as Icon } from '@expo/vector-icons';
 import {
-  CaseCarouselCard,
-  EmptyState,
-  ErrorState,
-  HeroHeader,
-  LoadingState,
-  QuickActionTaskCard,
-  Reveal,
-  Tab,
-  labelKeys,
-} from '../components/ui';
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import {
+  AmbientBackground,
+  GlassButton,
+  GlassIconButton,
+  GlassSurface,
+  GroupedSection,
+  HeroCard,
+  SegmentedControl,
+  Symbol,
+  SymbolKey,
+  Text,
+  radii,
+  usePalette,
+  usePressFeedback,
+} from '../components/apple';
+import { Tab, labelKeys } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useCases } from '../context/CasesContext';
-import { useSettings, useTheme } from '../context/SettingsContext';
-import { fonts } from '../theme/theme';
+import { useSettings } from '../context/SettingsContext';
 import { Case } from '../types/api.types';
 
 type Filter = 'ALL' | 'ACTIVE' | 'ARCHIVED';
 
-const CASE_ICONS: React.ComponentProps<typeof Icon>['name'][] = [
-  'gavel',
-  'account-balance',
-  'folder-special',
-  'verified-user',
-  'description',
-];
+const CASE_SYMBOLS: SymbolKey[] = ['gavel', 'brand', 'doc', 'shield', 'folder'];
+
+const APPLE_WARNING = '#FF9500';
+const APPLE_SUCCESS = '#34C759';
+
+interface AppleCaseCardProps {
+  item: Case;
+  selected: boolean;
+  iconName: SymbolKey;
+  onPress: () => void;
+  onOpenMap: () => void;
+  formatDate: (iso: string) => string;
+  defaultSummaryLabel: string;
+  updatedLabel: string;
+}
 
 /**
- * Screen 1 — Dashboard / Dockets Screen (Phase 3.1):
- * - Top: <HeroHeader /> with dark charcoal block, wave SVG overlay, lawyer greeting, avatar,
- *   and overlapping floating search bar to filter dockets.
- * - Middle ("Active Cases"): Horizontal ScrollView of <CaseCarouselCard /> fed by real
- *   `caseService.getCases()` data (`variant="primary"` for selected/lead docket, `variant="secondary"` for others).
- * - Bottom ("Pending Actions"): Vertical list of <QuickActionTaskCard /> derived from real
- *   docket/canvas/audit state with interactive checkboxes and status dot indicators.
+ * Tarjeta de caso con el kit estilo Apple (tarjeta redondeada, limpia y táctil).
+ */
+function AppleCaseCard({
+  item,
+  selected,
+  iconName,
+  onPress,
+  onOpenMap,
+  formatDate,
+  defaultSummaryLabel,
+  updatedLabel,
+}: AppleCaseCardProps) {
+  const palette = usePalette();
+  const press = usePressFeedback(0.97);
+  const { width } = useWindowDimensions();
+  const cardWidth = Math.min(Math.max(width * 0.58, 210), 255);
+
+  const summaryText =
+    item.description && item.description.trim().length > 0
+      ? item.description
+      : `${updatedLabel} ${formatDate(item.updatedAt)} • ${defaultSummaryLabel}`;
+
+  return (
+    <Animated.View style={[press.container, { width: cardWidth }]}>
+      <Pressable
+        onPress={onPress}
+        {...press.handlers}
+        accessibilityRole="button"
+        accessibilityLabel={item.title}
+        style={[
+          styles.caseCard,
+          {
+            backgroundColor: palette.surface,
+            borderColor: selected
+              ? palette.mode === 'dark'
+                ? 'rgba(255,255,255,0.28)'
+                : 'rgba(28,28,30,0.18)'
+              : palette.separator,
+            shadowColor: palette.mode === 'dark' ? '#000000' : palette.glass.shadow,
+            shadowOpacity: selected ? 0.14 : 0.06,
+          },
+        ]}
+      >
+        {/* Fila superior: Ícono circular de vidrio + radicado / traducción */}
+        <View style={styles.caseTopRow}>
+          <View style={[styles.caseIconCircle, { backgroundColor: palette.groupedBackground }]}>
+            <Symbol name={iconName} size={18} color={palette.label} />
+          </View>
+          <View style={styles.caseMetaRight}>
+            {item.isTranslated && (
+              <Symbol name="translate" size={13} color={palette.secondaryLabel} />
+            )}
+            {item.clientReference ? (
+              <View style={[styles.referencePill, { backgroundColor: palette.groupedBackground }]}>
+                <Text variant="caption" weight="500" color={palette.secondaryLabel} numberOfLines={1}>
+                  {item.clientReference}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Bloque central: Título en negrita y resumen limpio */}
+        <View style={styles.caseTextBlock}>
+          <Text variant="headline" numberOfLines={2} style={styles.caseTitle}>
+            {item.title}
+          </Text>
+          <Text variant="footnote" color={palette.secondaryLabel} numberOfLines={3} style={styles.caseSummary}>
+            {summaryText}
+          </Text>
+        </View>
+
+        {/* Fila inferior: Fecha de actualización + botón flecha hacia el mapa */}
+        <View style={styles.caseBottomRow}>
+          <Text variant="caption" color={palette.secondaryLabel}>
+            {formatDate(item.updatedAt)}
+          </Text>
+          <Pressable
+            onPress={onOpenMap}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir mapa"
+            style={[styles.caseArrowCircle, { backgroundColor: palette.groupedBackground }]}
+          >
+            <Symbol name="arrowRight" size={12} color={palette.label} weight="semibold" />
+          </Pressable>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/**
+ * Pantalla principal (Home / Casos) rediseñada con el kit estilo Apple de Iurify Case.
+ * Sigue la dirección visual de la pantalla de inicio de sesión:
+ * - Tarjeta héroe superior con degradado lavanda/gris, titular bold y controles de vidrio.
+ * - Fondo agrupado de iOS (AmbientBackground) con manchas de color difuminadas.
+ * - Barra de búsqueda de vidrio y selector segmentado animado.
+ * - Carrusel de casos con tarjetas Apple de superficies limpias y tipografía nativa.
+ * - Lista de acciones pendientes agrupada en tarjeta estilo iOS con filas y separadores.
  */
 export default function DashboardScreen({
   onNavigate,
@@ -44,7 +158,7 @@ export default function DashboardScreen({
   onNavigate: (tab: Tab) => void;
   onNewCase: () => void;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { t, language } = useSettings();
   const { user } = useAuth();
   const { cases, refreshCases, selectedCase, selectCase, canvas, audit } = useCases();
@@ -52,17 +166,6 @@ export default function DashboardScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('ALL');
   const [completedTaskIds, setCompletedTaskIds] = useState<Record<string, boolean>>({});
-
-  const cycleFilter = () => {
-    setFilter((prev) => (prev === 'ALL' ? 'ACTIVE' : prev === 'ACTIVE' ? 'ARCHIVED' : 'ALL'));
-  };
-
-  const activeFilterLabel =
-    filter === 'ACTIVE'
-      ? t('cases.filter.active')
-      : filter === 'ARCHIVED'
-        ? t('cases.filter.archived')
-        : undefined;
 
   const filteredCases = useMemo(() => {
     const list = cases.data ?? [];
@@ -81,7 +184,7 @@ export default function DashboardScreen({
     });
   }, [cases.data, filter, searchQuery]);
 
-  // Derive real actionable legal items from the selected case, its canvas elements, and audit alerts
+  // Derivar acciones legales accionables a partir del caso seleccionado, canvas y auditoría
   const actionTasks = useMemo(() => {
     if (!selectedCase) return [];
 
@@ -97,14 +200,14 @@ export default function DashboardScreen({
     const alerts = audit.data?.alerts ?? [];
     const nodes = canvas.data?.canvas.nodes ?? [];
 
-    // 1. Real AI Audit alerts (FR-004) become top-priority actionable tasks
+    // 1. Alertas de auditoría IA
     alerts.forEach((alert) => {
       const color =
         alert.severity === 'HIGH'
           ? palette.danger
           : alert.severity === 'MEDIUM'
-            ? palette.warning
-            : palette.success;
+            ? APPLE_WARNING
+            : APPLE_SUCCESS;
       items.push({
         id: `alert-${alert.id}`,
         title: `${alert.title} — ${alert.description}`,
@@ -114,19 +217,19 @@ export default function DashboardScreen({
       });
     });
 
-    // 2. Real case elements (Facts, Evidence, Statutes, Precedents)
+    // 2. Elementos del caso (Hechos, Pruebas, Leyes, Precedentes)
     nodes.forEach((node) => {
       items.push({
         id: `node-${node.id}`,
         title: `${node.title}: ${node.content}`,
         subtitle: `${selectedCase.title} • ${t(labelKeys.nodeType(node.type))}`,
-        statusColor: node.type === 'EVIDENCE' ? palette.success : palette.charcoal,
+        statusColor: node.type === 'EVIDENCE' ? APPLE_SUCCESS : palette.label,
         defaultChecked: node.userModified,
         targetTab: 'caseMap',
       });
     });
 
-    // 3. Procedural workflow actions based on real state of the selected case
+    // 3. Flujo procedimental
     if (nodes.length === 0) {
       items.push({
         id: `ingest-${selectedCase.id}`,
@@ -134,7 +237,7 @@ export default function DashboardScreen({
         subtitle: selectedCase.clientReference
           ? `${selectedCase.title} • ${selectedCase.clientReference}`
           : selectedCase.title,
-        statusColor: palette.warning,
+        statusColor: APPLE_WARNING,
         targetTab: 'caseMap',
       });
     } else if (!audit.data) {
@@ -142,7 +245,7 @@ export default function DashboardScreen({
         id: `run-audit-${selectedCase.id}`,
         title: t('tasks.auditReady'),
         subtitle: `${selectedCase.title} • ${nodes.length} ${t('common.elements')}`,
-        statusColor: palette.warning,
+        statusColor: APPLE_WARNING,
         targetTab: 'audit',
       });
     } else {
@@ -150,7 +253,7 @@ export default function DashboardScreen({
         id: `audit-done-${selectedCase.id}`,
         title: t('tasks.auditReviewed'),
         subtitle: selectedCase.title,
-        statusColor: palette.success,
+        statusColor: APPLE_SUCCESS,
         defaultChecked: true,
         targetTab: 'audit',
       });
@@ -183,81 +286,151 @@ export default function DashboardScreen({
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: palette.background }]}>
+    <AmbientBackground>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={cases.loading && totalCases > 0}
             onRefresh={refreshCases}
-            tintColor={palette.text}
+            tintColor={palette.label}
           />
         }
       >
-        {/* Top Hero Header with Overlapping Search Bar */}
-        <HeroHeader
-          greeting={greetingText}
-          headline={t('hero.headline')}
-          userName={user?.fullName}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder={t('hero.searchPlaceholder')}
-          onFilterPress={cycleFilter}
-          activeFilterLabel={activeFilterLabel}
-          onAvatarPress={() => onNavigate('settings')}
-        />
-
-        <View style={styles.bodyContainer}>
-          {cases.loading && totalCases === 0 ? (
-            <LoadingState />
-          ) : cases.error && totalCases === 0 ? (
-            <ErrorState onRetry={refreshCases} />
-          ) : totalCases === 0 ? (
-            <EmptyState
-              icon="folder-open"
-              title={t('cases.empty.title')}
-              body={t('cases.empty.body')}
-              actionLabel={t('nav.newCase')}
-              onAction={onNewCase}
+        {/* Tarjeta Héroe superior estilo Apple */}
+        <HeroCard>
+          <View style={styles.brandRow}>
+            <Text variant="headline">
+              Iurify <Text variant="headline" weight="500" color={palette.secondaryLabel}>Case</Text>
+            </Text>
+            <GlassIconButton
+              icon="person"
+              size={36}
+              accessibilityLabel="Ajustes y perfil"
+              onPress={() => onNavigate('settings')}
             />
+          </View>
+
+          <Animated.View entering={FadeIn.duration(260)} style={styles.heroText}>
+            <Text variant="subheadline" weight="500" color={palette.secondaryLabel}>
+              {greetingText}
+            </Text>
+            <Text variant="display" style={styles.headline} accessibilityRole="header">
+              {t('hero.headline')}
+            </Text>
+          </Animated.View>
+
+          {/* Barra de búsqueda con vidrio claro */}
+          <View style={styles.searchContainer}>
+            <GlassSurface radius={radii.pill} contentStyle={styles.searchBar}>
+              <Symbol name="search" size={17} color={palette.secondaryLabel} />
+              <TextInput
+                placeholder={t('hero.searchPlaceholder')}
+                placeholderTextColor={palette.placeholder}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={[styles.searchInput, { color: palette.label }]}
+                selectionColor={palette.label}
+                keyboardAppearance={palette.mode}
+                returnKeyType="search"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+              />
+              {searchQuery.length > 0 && (
+                <Pressable
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel="Borrar texto"
+                  style={styles.clearBtn}
+                >
+                  <Symbol name="clear" size={16} color={palette.secondaryLabel} />
+                </Pressable>
+              )}
+            </GlassSurface>
+          </View>
+
+          {/* Selector segmentado de filtros de vidrio */}
+          <View style={styles.filterContainer}>
+            <SegmentedControl
+              value={filter}
+              onChange={(val) => setFilter(val)}
+              options={[
+                { value: 'ALL', label: t('cases.filter.all') },
+                { value: 'ACTIVE', label: t('cases.filter.active') },
+                { value: 'ARCHIVED', label: t('cases.filter.archived') },
+              ]}
+            />
+          </View>
+        </HeroCard>
+
+        {/* Contenido principal en el fondo agrupado de iOS */}
+        <Animated.View entering={FadeInDown.duration(380).delay(60)} style={styles.contentBody}>
+          {cases.loading && totalCases === 0 ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surface }]}>
+              <ActivityIndicator size="small" color={palette.label} />
+              <Text variant="subheadline" color={palette.secondaryLabel} style={{ marginTop: 10 }}>
+                {t('common.loading')}
+              </Text>
+            </View>
+          ) : cases.error && totalCases === 0 ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surface }]}>
+              <Symbol name="error" size={32} color={palette.danger} />
+              <Text variant="headline" style={{ marginTop: 10 }}>
+                {t('common.error')}
+              </Text>
+              <GlassButton
+                label={t('common.retry')}
+                onPress={refreshCases}
+                style={{ marginTop: 16, width: '100%' }}
+              />
+            </View>
+          ) : totalCases === 0 ? (
+            <View style={[styles.stateCard, { backgroundColor: palette.surface }]}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: palette.groupedBackground }]}>
+                <Symbol name="folderOpen" size={32} color={palette.secondaryLabel} />
+              </View>
+              <Text variant="headline" style={styles.emptyTitle}>
+                {t('cases.empty.title')}
+              </Text>
+              <Text variant="subheadline" color={palette.secondaryLabel} style={styles.emptySubtitle}>
+                {t('cases.empty.body')}
+              </Text>
+              <GlassButton
+                label={t('nav.newCase')}
+                icon="plus"
+                onPress={onNewCase}
+                style={{ marginTop: 18, width: '100%' }}
+              />
+            </View>
           ) : (
             <>
-              {/* Middle Section: Horizontal Carousel of Active Cases ("Project" section) */}
+              {/* Sección 1: Carrusel de Casos Activos */}
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeader}>
-                  <Text
-                    style={{
-                      fontFamily: fonts.semibold,
-                      fontSize: 19,
-                      color: palette.text,
-                      letterSpacing: -0.2,
-                    }}
-                  >
+                  <Text variant="title2" weight="700">
                     {t('cases.title')}
                   </Text>
-                  <Pressable onPress={() => onNavigate('caseMap')} hitSlop={8}>
-                    <Text
-                      style={{
-                        fontFamily: fonts.medium,
-                        fontSize: 12.5,
-                        color: palette.textMuted,
-                      }}
-                    >
+                  <Pressable
+                    onPress={() => onNavigate('caseMap')}
+                    hitSlop={8}
+                    style={styles.headerAction}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.viewAll')}
+                  >
+                    <Text variant="subheadline" weight="500" color={palette.secondaryLabel}>
                       {t('common.viewAll')}
                     </Text>
+                    <Symbol name="chevronRight" size={13} color={palette.secondaryLabel} />
                   </Pressable>
                 </View>
 
                 {filteredCases.length === 0 ? (
-                  <View style={styles.emptyFilterBox}>
-                    <Text
-                      style={{
-                        fontFamily: fonts.body,
-                        fontSize: 13.5,
-                        color: palette.textMuted,
-                      }}
-                    >
+                  <View style={[styles.emptyFilterCard, { backgroundColor: palette.surface }]}>
+                    <Symbol name="search" size={24} color={palette.secondaryLabel} />
+                    <Text variant="subheadline" color={palette.secondaryLabel} style={{ textAlign: 'center' }}>
                       {t('cases.noFilterResults')}
                     </Text>
                   </View>
@@ -270,98 +443,158 @@ export default function DashboardScreen({
                   >
                     {filteredCases.map((c, idx) => {
                       const isPrimary = selectedCase ? c.id === selectedCase.id : idx === 0;
-                      const icon = CASE_ICONS[idx % CASE_ICONS.length];
-                      const summaryText =
-                        c.description && c.description.trim().length > 0
-                          ? c.description
-                          : `${t('cases.updated')} ${formatDate(c.updatedAt)} • ${t('cases.defaultSummary')}`;
-
+                      const iconName = CASE_SYMBOLS[idx % CASE_SYMBOLS.length];
                       return (
-                        <Reveal key={c.id} index={idx}>
-                          <CaseCarouselCard
-                            variant={isPrimary ? 'primary' : 'secondary'}
-                            title={c.title}
-                            summary={summaryText}
-                            reference={c.clientReference}
-                            icon={icon}
-                            isTranslated={c.isTranslated}
-                            onPress={() => selectCase(c.id)}
-                            onArrowPress={() => handleOpenCaseMap(c)}
-                          />
-                        </Reveal>
+                        <AppleCaseCard
+                          key={c.id}
+                          item={c}
+                          selected={isPrimary}
+                          iconName={iconName}
+                          onPress={() => selectCase(c.id)}
+                          onOpenMap={() => handleOpenCaseMap(c)}
+                          formatDate={formatDate}
+                          defaultSummaryLabel={t('cases.defaultSummary')}
+                          updatedLabel={t('cases.updated')}
+                        />
                       );
                     })}
                   </ScrollView>
                 )}
               </View>
 
-              {/* Bottom Section: Vertical List of Pending Legal Actions ("Tasks" section) */}
+              {/* Sección 2: Acciones Pendientes en tarjeta agrupada estilo iOS */}
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeader}>
-                  <Text
-                    style={{
-                      fontFamily: fonts.semibold,
-                      fontSize: 19,
-                      color: palette.text,
-                      letterSpacing: -0.2,
-                    }}
-                  >
+                  <Text variant="title2" weight="700">
                     {t('tasks.title')}
                   </Text>
                   <Pressable
                     onPress={() => onNavigate('audit')}
-                    style={styles.allTasksAction}
                     hitSlop={8}
+                    style={styles.headerAction}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('tasks.allTasks')}
                   >
-                    <Text
-                      style={{
-                        fontFamily: fonts.medium,
-                        fontSize: 12.5,
-                        color: palette.textMuted,
-                      }}
-                    >
+                    <Text variant="subheadline" weight="500" color={palette.secondaryLabel}>
                       {t('tasks.allTasks')}
                     </Text>
-                    <Icon name="keyboard-arrow-down" size={16} color={palette.textMuted} />
+                    <Symbol name="chevronRight" size={13} color={palette.secondaryLabel} />
                   </Pressable>
                 </View>
 
-                <View style={styles.tasksList}>
-                  {actionTasks.map((task, idx) => {
-                    const isChecked = completedTaskIds[task.id] ?? task.defaultChecked ?? false;
-                    return (
-                      <Reveal key={task.id} index={idx}>
-                        <QuickActionTaskCard
-                          title={task.title}
-                          subtitle={task.subtitle}
-                          checked={isChecked}
-                          statusColor={task.statusColor}
-                          onToggle={() => toggleTask(task.id, task.defaultChecked)}
+                {actionTasks.length === 0 ? (
+                  <View style={[styles.emptyFilterCard, { backgroundColor: palette.surface }]}>
+                    <Symbol name="checkmark" size={24} color={APPLE_SUCCESS} />
+                    <Text variant="subheadline" color={palette.secondaryLabel} style={{ textAlign: 'center' }}>
+                      {t('tasks.empty')}
+                    </Text>
+                  </View>
+                ) : (
+                  <GroupedSection>
+                    {actionTasks.map((task) => {
+                      const isChecked = completedTaskIds[task.id] ?? task.defaultChecked ?? false;
+                      return (
+                        <Pressable
+                          key={task.id}
                           onPress={() => onNavigate(task.targetTab)}
-                        />
-                      </Reveal>
-                    );
-                  })}
-                </View>
+                          style={styles.taskRow}
+                          accessibilityRole="button"
+                          accessibilityLabel={task.title}
+                        >
+                          {/* Casilla circular estilo Recordatorios de iOS */}
+                          <Pressable
+                            onPress={() => toggleTask(task.id, task.defaultChecked)}
+                            hitSlop={12}
+                            style={[
+                              styles.taskCheckbox,
+                              isChecked
+                                ? { backgroundColor: palette.label, borderColor: palette.label }
+                                : { backgroundColor: 'transparent', borderColor: task.statusColor },
+                            ]}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: isChecked }}
+                          >
+                            {isChecked ? (
+                              <Symbol name="checkmark" size={11} color={palette.surface} weight="bold" />
+                            ) : null}
+                          </Pressable>
+
+                          {/* Textos de la tarea */}
+                          <View style={styles.taskTextColumn}>
+                            <Text
+                              variant="subheadline"
+                              weight={isChecked ? '400' : '600'}
+                              color={isChecked ? palette.secondaryLabel : palette.label}
+                              numberOfLines={2}
+                              style={isChecked ? styles.taskCheckedText : undefined}
+                            >
+                              {task.title}
+                            </Text>
+                            <Text
+                              variant="caption"
+                              color={palette.secondaryLabel}
+                              numberOfLines={1}
+                              style={styles.taskSubtitle}
+                            >
+                              {task.subtitle}
+                            </Text>
+                          </View>
+
+                          <Symbol name="chevronRight" size={13} color={palette.secondaryLabel} />
+                        </Pressable>
+                      );
+                    })}
+                  </GroupedSection>
+                )}
               </View>
             </>
           )}
-        </View>
+        </Animated.View>
       </ScrollView>
-    </View>
+    </AmbientBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
   scrollContent: {
-    paddingBottom: 130,
+    paddingBottom: 125,
   },
-  bodyContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 18,
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroText: {
+    marginTop: 22,
+    gap: 4,
+  },
+  headline: {
+    marginTop: 2,
+  },
+  searchContainer: {
+    marginTop: 20,
+  },
+  searchBar: {
+    height: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  filterContainer: {
+    marginTop: 14,
+  },
+  contentBody: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
     gap: 26,
   },
   sectionBlock: {
@@ -371,25 +604,131 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 4,
   },
-  carouselScroll: {
-    marginHorizontal: -24,
-  },
-  carouselContent: {
-    paddingHorizontal: 24,
-    gap: 16,
-    paddingVertical: 4,
-  },
-  emptyFilterBox: {
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  allTasksAction: {
+  headerAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
-  tasksList: {
-    gap: 12,
+  carouselScroll: {
+    marginHorizontal: -16,
+  },
+  carouselContent: {
+    paddingHorizontal: 16,
+    gap: 14,
+    paddingVertical: 4,
+  },
+  caseCard: {
+    borderRadius: radii.group,
+    padding: 16,
+    height: 205,
+    borderWidth: 1,
+    justifyContent: 'space-between',
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  caseTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  caseIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  caseMetaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  referencePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    maxWidth: 100,
+  },
+  caseTextBlock: {
+    gap: 6,
+    marginVertical: 4,
+  },
+  caseTitle: {
+    lineHeight: 21,
+  },
+  caseSummary: {
+    lineHeight: 17,
+  },
+  caseBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  caseArrowCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+    minHeight: 56,
+  },
+  taskCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskTextColumn: {
+    flex: 1,
+    gap: 3,
+  },
+  taskSubtitle: {
+    marginTop: 1,
+  },
+  taskCheckedText: {
+    textDecorationLine: 'line-through',
+  },
+  stateCard: {
+    borderRadius: radii.group,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 12,
+  },
+  emptyFilterCard: {
+    borderRadius: radii.group,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
 });
