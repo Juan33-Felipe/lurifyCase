@@ -8,6 +8,7 @@ export type CaseStatus = 'ACTIVE' | 'ARCHIVED';
 
 export interface Case {
   id: Uuid;
+  userId?: Uuid;
   title: string;
   description?: string;
   clientReference?: string;

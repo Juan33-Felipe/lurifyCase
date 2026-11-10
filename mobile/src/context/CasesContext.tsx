@@ -10,6 +10,7 @@ import {
   DeadlinePriority,
 } from '../types/api.types';
 import { useSettings } from './SettingsContext';
+import { useAuth } from './AuthContext';
 import {
   translateAudit,
   translateCanvas,
@@ -61,6 +62,8 @@ const CasesContext = createContext<CasesContextValue | null>(null);
  */
 export function CasesProvider({ children }: { children: React.ReactNode }) {
   const { language, autoTranslate } = useSettings();
+  const { user } = useAuth();
+  const userId = user?.id;
   const [cases, setCases] = useState<Remote<Case[]>>({ data: null, loading: true, error: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [canvasState, setCanvasState] = useState<{ caseId: string; snapshot: CanvasSnapshot | null; error: boolean } | null>(null);
@@ -145,12 +148,20 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   const loadCases = useCallback(async () => {
     try {
       const res = await caseService.getCases();
-      setCases({ data: res.items, loading: false, error: false });
-      setSelectedId((cur) => (cur && res.items.some((c) => c.id === cur) ? cur : res.items[0]?.id ?? null));
+      // Garantizar que cuentas nuevas solo vean sus propios expedientes
+      const userCases = userId
+        ? res.items.filter(
+            (c) =>
+              c.userId &&
+              c.userId.toString().toLowerCase() === userId.toString().toLowerCase()
+          )
+        : [];
+      setCases({ data: userCases, loading: false, error: false });
+      setSelectedId((cur) => (cur && userCases.some((c) => c.id === cur) ? cur : userCases[0]?.id ?? null));
     } catch {
       setCases((p) => ({ ...p, loading: false, error: true }));
     }
-  }, []);
+  }, [userId]);
 
   const refreshCases = useCallback(async () => {
     setCases((p) => ({ ...p, loading: true, error: false }));
@@ -163,14 +174,21 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
       .getCases()
       .then((res) => {
         if (!active) return;
-        setCases({ data: res.items, loading: false, error: false });
-        setSelectedId(res.items[0]?.id ?? null);
+        const userCases = userId
+          ? res.items.filter(
+              (c) =>
+                c.userId &&
+                c.userId.toString().toLowerCase() === userId.toString().toLowerCase()
+            )
+          : [];
+        setCases({ data: userCases, loading: false, error: false });
+        setSelectedId(userCases[0]?.id ?? null);
       })
       .catch(() => active && setCases((p) => ({ ...p, loading: false, error: true })));
     return () => {
       active = false;
     };
-  }, []);
+  }, [userId]);
 
   // Fetch the canvas of the selected case.
   useEffect(() => {
@@ -221,12 +239,16 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     [canvasCurrent, selectedId]
   );
 
-  const createCase = useCallback(async (payload: CreateCaseRequest) => {
-    const created = await caseService.createCase(payload);
-    setCases((p) => ({ ...p, data: [created, ...(p.data ?? [])] }));
-    setSelectedId(created.id);
-    return created;
-  }, []);
+  const createCase = useCallback(
+    async (payload: CreateCaseRequest) => {
+      const created = await caseService.createCase(payload);
+      const withUser: Case = userId && !created.userId ? { ...created, userId } : created;
+      setCases((p) => ({ ...p, data: [withUser, ...(p.data ?? [])] }));
+      setSelectedId(withUser.id);
+      return withUser;
+    },
+    [userId]
+  );
 
   const applyCanvas = useCallback((snapshot: CanvasSnapshot) => {
     setCanvasState({ caseId: snapshot.caseId, snapshot, error: false });

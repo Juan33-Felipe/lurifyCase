@@ -36,7 +36,7 @@ public class CaseService {
     public List<Case> listCases(UUID userId, String statusFilter, Integer limit) {
         List<Case> cases = (userId != null)
                 ? caseRepository.findByUserId(userId)
-                : caseRepository.findAll();
+                : Collections.emptyList();
         if (statusFilter != null && !statusFilter.isBlank()) {
             String normalizedStatus = statusFilter.trim().toUpperCase();
             cases = cases.stream()
