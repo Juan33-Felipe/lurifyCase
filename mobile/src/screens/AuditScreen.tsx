@@ -6,22 +6,23 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import {
   AmbientBackground,
   GlassButton,
   GlassIconButton,
   GlassSurface,
+  GroupedSection,
   HeroCard,
+  SegmentedControl,
   Symbol,
   Text,
+  TextFieldRow,
   radii,
   usePalette,
   usePressFeedback,
 } from '../components/apple';
 import {
-  Chip,
   DateRange,
   DateRangePreset,
   DateRangePicker,
@@ -34,7 +35,6 @@ import {
   DateRangePickerPresets,
   DateRangePickerSelection,
   DateRangePickerTrigger,
-  GlassInput,
   Tab,
   addDaysYMD,
   diffDaysYMD,
@@ -265,6 +265,7 @@ function AppleTimelineRow({
  */
 export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const palette = usePalette();
+  const isDark = palette.mode === 'dark';
   const { t, language } = useSettings();
   const {
     selectedCase,
@@ -634,121 +635,177 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
             </View>
           ) : (
             <>
-              {/* Sección de Plazos y Tiempos de Entrega con DateRangePicker Componible */}
+              {/* Sección de Plazos y Tiempos de Entrega con Kit estilo Apple */}
               <View style={styles.deadlinesSection}>
                 <View style={styles.sectionHeaderRow}>
                   <View style={styles.sectionTitleGroup}>
-                    <Icon name="event-note" size={20} color={palette.label} />
-                    <Text variant="headline">{t('audit.deadline.sectionTitle')}</Text>
+                    <View
+                      style={[
+                        styles.sectionIconCircle,
+                        { backgroundColor: palette.groupedBackground },
+                      ]}
+                    >
+                      <Symbol name="calendar" size={17} color={palette.label} />
+                    </View>
+                    <View>
+                      <Text variant="title2" weight="700">
+                        {t('audit.deadline.sectionTitle')}
+                      </Text>
+                      {deadlines.length > 0 ? (
+                        <Text
+                          variant="caption"
+                          color={palette.secondaryLabel}
+                          style={{ marginTop: 1 }}
+                        >
+                          {deadlines.filter((d) => !d.completed).length} {t('tasks.title').toLowerCase()} • {deadlines.length} total
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
 
-                  <Pressable
+                  <GlassButton
+                    label={showPlanner ? t('audit.deadline.hideForm') : t('audit.deadline.addButton')}
+                    icon={showPlanner ? 'close' : 'plus'}
                     onPress={() => {
                       setFormError(null);
                       setShowPlanner((prev) => !prev);
                     }}
-                    style={[
-                      styles.addDeadlinePill,
-                      {
-                        backgroundColor: showPlanner ? palette.surface : palette.label,
-                        borderColor: showPlanner ? palette.separator : palette.label,
-                      },
-                    ]}
-                  >
-                    <Icon
-                      name={showPlanner ? 'close' : 'add-alarm'}
-                      size={15}
-                      color={showPlanner ? palette.label : palette.surface}
-                    />
-                    <Text
-                      variant="caption"
-                      weight="600"
-                      color={showPlanner ? palette.label : palette.surface}
-                    >
-                      {showPlanner ? t('audit.deadline.hideForm') : t('audit.deadline.addButton')}
-                    </Text>
-                  </Pressable>
+                  />
                 </View>
 
                 {showPlanner ? (
-                  <View
+                  <Animated.View
+                    entering={FadeInDown.duration(240)}
                     style={[
                       styles.plannerCard,
                       {
                         backgroundColor: palette.surface,
-                        borderColor: palette.separator,
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                        shadowColor: isDark ? '#000000' : palette.glass.shadow,
                       },
                     ]}
                   >
-                    <Text variant="headline">{t('audit.deadline.formTitle')}</Text>
-
-                    <GlassInput
-                      icon="assignment"
-                      placeholder={t('audit.deadline.titlePlaceholder')}
-                      value={deadlineTitle}
-                      onChangeText={(txt) => {
-                        setDeadlineTitle(txt);
-                        if (formError) setFormError(null);
-                      }}
-                      maxLength={160}
-                    />
-
-                    <GlassInput
-                      icon="notes"
-                      placeholder={t('audit.deadline.notesPlaceholder')}
-                      value={deadlineNotes}
-                      onChangeText={setDeadlineNotes}
-                      maxLength={400}
-                    />
-
-                    <View style={styles.priorityRow}>
-                      {(['HIGH', 'MEDIUM', 'LOW'] as DeadlinePriority[]).map((p) => (
-                        <Chip
-                          key={p}
-                          label={t(`audit.deadline.priority.${p}` as any)}
-                          active={priority === p}
-                          onPress={() => setPriority(p)}
-                        />
-                      ))}
+                    <View style={styles.plannerHeader}>
+                      <View
+                        style={[
+                          styles.plannerIconWrap,
+                          { backgroundColor: palette.groupedBackground },
+                        ]}
+                      >
+                        <Symbol name="calendarBadgePlus" size={18} color={palette.label} />
+                      </View>
+                      <Text variant="headline" weight="700" style={{ flex: 1 }}>
+                        {t('audit.deadline.formTitle')}
+                      </Text>
                     </View>
 
-                    {/* Composable DateRangePicker */}
-                    <DateRangePicker
-                      label={t('audit.deadline.rangeLabel')}
-                      defaultMonth={selectedRange?.from ?? todayStr}
-                      value={selectedRange}
-                      onValueChange={(range) => {
-                        setSelectedRange(range);
-                        if (range?.from) {
-                          setSelectedDateKey(range.from);
-                          setSelectedDate(ymdToLocalDate(range.from));
-                        }
-                        if (formError) setFormError(null);
+                    {/* Entradas de texto agrupadas estilo iOS */}
+                    <GroupedSection
+                      style={{
+                        backgroundColor: palette.groupedBackground,
+                        borderWidth: 1,
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
                       }}
-                      presets={presets}
-                      locale={locale}
-                      defaultOpen={true}
                     >
-                      <DateRangePickerTrigger placeholder={t('audit.deadline.selectDates')} />
-                      <DateRangePickerContent inline={true}>
-                        <DateRangePickerCalendar showSummary={true} style={{ borderWidth: 0 }}>
-                          <DateRangePickerHeader />
-                          <DateRangePickerPresets />
-                          <DateRangePickerGrid />
-                          <DateRangePickerFooter>
-                            <View style={styles.pickerFooterRow}>
-                              <DateRangePickerSelection />
-                              <DateRangePickerClear />
-                            </View>
-                          </DateRangePickerFooter>
-                        </DateRangePickerCalendar>
-                      </DateRangePickerContent>
-                    </DateRangePicker>
+                      <TextFieldRow
+                        icon="doc"
+                        placeholder={t('audit.deadline.titlePlaceholder')}
+                        value={deadlineTitle}
+                        onChangeText={(txt) => {
+                          setDeadlineTitle(txt);
+                          if (formError) setFormError(null);
+                        }}
+                        maxLength={160}
+                      />
+                      <TextFieldRow
+                        icon="notes"
+                        placeholder={t('audit.deadline.notesPlaceholder')}
+                        value={deadlineNotes}
+                        onChangeText={setDeadlineNotes}
+                        maxLength={400}
+                      />
+                    </GroupedSection>
+
+                    {/* Selector de prioridad con SegmentedControl */}
+                    <View style={styles.formFieldBlock}>
+                      <Text
+                        variant="caption"
+                        weight="600"
+                        color={palette.secondaryLabel}
+                        style={{ marginLeft: 2 }}
+                      >
+                        {language === 'es' ? 'Prioridad del término' : 'Priority Level'}
+                      </Text>
+                      <SegmentedControl
+                        value={priority}
+                        onChange={(val) => setPriority(val as DeadlinePriority)}
+                        options={[
+                          { value: 'HIGH', label: t('audit.deadline.priority.HIGH') },
+                          { value: 'MEDIUM', label: t('audit.deadline.priority.MEDIUM') },
+                          { value: 'LOW', label: t('audit.deadline.priority.LOW') },
+                        ]}
+                      />
+                    </View>
+
+                    {/* Selector de rango de fechas DateRangePicker con diseño Apple */}
+                    <View style={styles.formFieldBlock}>
+                      <Text
+                        variant="caption"
+                        weight="600"
+                        color={palette.secondaryLabel}
+                        style={{ marginLeft: 2 }}
+                      >
+                        {t('audit.deadline.rangeLabel')}
+                      </Text>
+                      <DateRangePicker
+                        defaultMonth={selectedRange?.from ?? todayStr}
+                        value={selectedRange}
+                        onValueChange={(range) => {
+                          setSelectedRange(range);
+                          if (range?.from) {
+                            setSelectedDateKey(range.from);
+                            setSelectedDate(ymdToLocalDate(range.from));
+                          }
+                          if (formError) setFormError(null);
+                        }}
+                        presets={presets}
+                        locale={locale}
+                        defaultOpen={true}
+                      >
+                        <DateRangePickerTrigger placeholder={t('audit.deadline.selectDates')} />
+                        <DateRangePickerContent inline={true}>
+                          <DateRangePickerCalendar showSummary={true} style={{ borderWidth: 0 }}>
+                            <DateRangePickerHeader />
+                            <DateRangePickerPresets />
+                            <DateRangePickerGrid />
+                            <DateRangePickerFooter>
+                              <View style={styles.pickerFooterRow}>
+                                <DateRangePickerSelection />
+                                <DateRangePickerClear />
+                              </View>
+                            </DateRangePickerFooter>
+                          </DateRangePickerCalendar>
+                        </DateRangePickerContent>
+                      </DateRangePicker>
+                    </View>
 
                     {formError ? (
-                      <Text variant="footnote" color={palette.danger}>
-                        {formError}
-                      </Text>
+                      <View
+                        style={[
+                          styles.errorBanner,
+                          {
+                            backgroundColor: isDark
+                              ? 'rgba(255, 69, 58, 0.12)'
+                              : 'rgba(217, 48, 54, 0.08)',
+                            borderColor: palette.danger,
+                          },
+                        ]}
+                      >
+                        <Symbol name="error" size={15} color={palette.danger} />
+                        <Text variant="footnote" color={palette.danger} style={{ flex: 1 }}>
+                          {formError}
+                        </Text>
+                      </View>
                     ) : null}
 
                     <View style={styles.plannerActions}>
@@ -764,7 +821,7 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                         style={{ flex: 1 }}
                       />
                     </View>
-                  </View>
+                  </Animated.View>
                 ) : null}
 
                 {deadlines.length === 0 && !showPlanner ? (
@@ -774,7 +831,8 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                       styles.emptyDeadlinesBox,
                       {
                         backgroundColor: palette.surface,
-                        borderColor: palette.separator,
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.07)',
+                        shadowColor: isDark ? '#000000' : palette.glass.shadow,
                       },
                     ]}
                   >
@@ -784,16 +842,28 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                         { backgroundColor: palette.groupedBackground },
                       ]}
                     >
-                      <Icon name="date-range" size={20} color={palette.label} />
+                      <Symbol name="calendarBadgePlus" size={20} color={palette.label} />
                     </View>
-                    <Text
-                      variant="footnote"
-                      color={palette.secondaryLabel}
-                      style={{ flex: 1, lineHeight: 18 }}
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text variant="subheadline" weight="600" color={palette.label}>
+                        {t('audit.deadline.sectionTitle')}
+                      </Text>
+                      <Text
+                        variant="caption"
+                        color={palette.secondaryLabel}
+                        style={{ lineHeight: 17 }}
+                      >
+                        {t('audit.deadline.empty')}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.emptyAddCircle,
+                        { backgroundColor: palette.groupedBackground },
+                      ]}
                     >
-                      {t('audit.deadline.empty')}
-                    </Text>
-                    <Symbol name="chevronRight" size={12} color={palette.secondaryLabel} />
+                      <Symbol name="plus" size={14} color={palette.label} />
+                    </View>
                   </Pressable>
                 ) : (
                   <View style={styles.deadlinesList}>
@@ -807,25 +877,27 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                             styles.deadlineCard,
                             {
                               backgroundColor: palette.surface,
-                              borderColor: palette.separator,
+                              borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+                              shadowColor: isDark ? '#000000' : palette.glass.shadow,
                             },
                           ]}
                         >
+                          {/* Casilla circular estilo Recordatorios de iOS */}
                           <Pressable
                             onPress={() => toggleDeadline(dl.id)}
-                            hitSlop={8}
+                            hitSlop={10}
                             style={[
                               styles.deadlineCheck,
-                              {
-                                backgroundColor: dl.completed
-                                  ? palette.label
-                                  : palette.groupedBackground,
-                                borderColor: dl.completed ? palette.label : palette.separator,
-                              },
+                              dl.completed
+                                ? { backgroundColor: palette.label, borderColor: palette.label }
+                                : {
+                                    backgroundColor: 'transparent',
+                                    borderColor: dl.priority === 'HIGH' ? '#FF9500' : palette.separator,
+                                  },
                             ]}
                           >
                             {dl.completed ? (
-                              <Icon name="check" size={14} color={palette.surface} />
+                              <Symbol name="checkmark" size={11} color={palette.surface} weight="bold" />
                             ) : null}
                           </Pressable>
 
@@ -844,7 +916,7 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                                 style={{
                                   flex: 1,
                                   textDecorationLine: dl.completed ? 'line-through' : 'none',
-                                  opacity: dl.completed ? 0.6 : 1,
+                                  opacity: dl.completed ? 0.55 : 1,
                                 }}
                               >
                                 {dl.title}
@@ -861,27 +933,67 @@ export default function AuditScreen({ onNavigate }: { onNavigate: (tab: Tab) => 
                                 variant="caption"
                                 color={palette.secondaryLabel}
                                 numberOfLines={2}
-                                style={{ marginTop: 2 }}
+                                style={{ marginTop: 3 }}
                               >
                                 {dl.notes}
                               </Text>
                             ) : null}
 
                             <View style={styles.deadlineMetaRow}>
-                              <Icon name="calendar-today" size={12} color={palette.secondaryLabel} />
-                              <Text variant="caption" color={palette.secondaryLabel}>
-                                {formatShortDate(dl.from, locale)} → {formatShortDate(dl.to, locale)}{' '}
-                                ({daysTotal}d)
-                              </Text>
+                              <View
+                                style={[
+                                  styles.metaPill,
+                                  { backgroundColor: palette.groupedBackground },
+                                ]}
+                              >
+                                <Symbol name="calendar" size={11} color={palette.secondaryLabel} />
+                                <Text variant="caption" weight="500" color={palette.secondaryLabel}>
+                                  {formatShortDate(dl.from, locale)} → {formatShortDate(dl.to, locale)}
+                                </Text>
+                              </View>
+
+                              <View
+                                style={[
+                                  styles.metaPill,
+                                  { backgroundColor: palette.groupedBackground },
+                                ]}
+                              >
+                                <Symbol
+                                  name="flag"
+                                  size={10}
+                                  color={dl.priority === 'HIGH' ? '#FF9500' : palette.secondaryLabel}
+                                />
+                                <Text
+                                  variant="caption"
+                                  weight="600"
+                                  color={dl.priority === 'HIGH' ? '#FF9500' : palette.secondaryLabel}
+                                >
+                                  {t(`audit.deadline.priority.${dl.priority}` as any)}
+                                </Text>
+                              </View>
+
+                              <View
+                                style={[
+                                  styles.metaPill,
+                                  { backgroundColor: palette.groupedBackground },
+                                ]}
+                              >
+                                <Text variant="caption" weight="600" color={palette.secondaryLabel}>
+                                  {daysTotal}d
+                                </Text>
+                              </View>
                             </View>
                           </Pressable>
 
                           <Pressable
                             onPress={() => removeDeadline(dl.id)}
-                            hitSlop={8}
-                            style={styles.deleteBtn}
+                            hitSlop={10}
+                            style={[
+                              styles.deleteBtn,
+                              { backgroundColor: palette.groupedBackground },
+                            ]}
                           >
-                            <Icon name="delete-outline" size={19} color={palette.secondaryLabel} />
+                            <Symbol name="trash" size={13} color={palette.secondaryLabel} />
                           </Pressable>
                         </View>
                       );
@@ -970,37 +1082,60 @@ const styles = StyleSheet.create({
     gap: 18,
   },
   deadlinesSection: {
-    gap: 12,
+    gap: 14,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   sectionTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    flex: 1,
   },
-  addDeadlinePill: {
-    flexDirection: 'row',
+  sectionIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radii.pill,
-    borderWidth: 1,
+    justifyContent: 'center',
   },
   plannerCard: {
     borderRadius: radii.group,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
-    gap: 12,
+    gap: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  priorityRow: {
+  plannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  plannerIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  formFieldBlock: {
+    gap: 6,
+  },
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: radii.segment,
+    borderWidth: 1,
   },
   pickerFooterRow: {
     flexDirection: 'row',
@@ -1012,20 +1147,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
   emptyDeadlinesBox: {
     borderRadius: radii.group,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   emptyDeadlineIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyAddCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1037,16 +1183,21 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   deadlineCheck: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
   deadlineTopRow: {
     flexDirection: 'row',
@@ -1061,12 +1212,26 @@ const styles = StyleSheet.create({
   },
   deadlineMetaRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 5,
+    gap: 6,
+    marginTop: 8,
+  },
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: radii.pill,
   },
   deleteBtn: {
-    padding: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
   },
   timelineList: {
     gap: 0,
