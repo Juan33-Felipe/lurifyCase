@@ -11,22 +11,26 @@ import {
   ScrollView,
   StyleProp,
   StyleSheet,
-  Text,
   View,
   ViewStyle,
 } from 'react-native';
-import { MaterialIcons as Icon } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   FadeOut,
-  SlideInRight,
   SlideInLeft,
+  SlideInRight,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { useSettings, useTheme } from '../../context/SettingsContext';
-import { fonts, radius } from '../../theme/theme';
+import {
+  Symbol,
+  Text,
+  radii,
+  usePalette,
+  usePressFeedback,
+} from '../apple';
+import { useSettings } from '../../context/SettingsContext';
 
 /* -------------------------------------------------------------------------- */
 /*                                    Types                                   */
@@ -72,7 +76,7 @@ interface DateRangePickerContextValue {
   selectDate: (dateStr: string) => void;
   selectPreset: (preset: DateRange) => void;
   clear: () => void;
-  visibleMonth: { year: number; month: number }; // month: 0..11
+  visibleMonth: { year: number; month: number };
   direction: 'left' | 'right';
   goToMonth: (year: number, month: number) => void;
   prevMonth: () => void;
@@ -225,8 +229,7 @@ export function DateRangePicker({
     if (parsed) return { year: parsed.year, month: parsed.month };
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentRange.from, defaultMonth]);
 
   const [visibleMonth, setVisibleMonth] = useState<{ year: number; month: number }>(initialMonthObj);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
@@ -260,10 +263,8 @@ export function DateRangePicker({
 
       const { from, to } = currentRange;
       if (!from || (from && to)) {
-        // Start a new range
         setRange({ from: dateStr, to: null });
       } else {
-        // Complete the range
         const nextRange: DateRange =
           dateStr < from ? { from: dateStr, to: from } : { from, to: dateStr };
         setRange(nextRange);
@@ -297,17 +298,14 @@ export function DateRangePicker({
     setRange(null);
   }, [disabled, setRange]);
 
-  const goToMonth = useCallback(
-    (year: number, month: number) => {
-      setVisibleMonth((prev) => {
-        const prevTotal = prev.year * 12 + prev.month;
-        const nextTotal = year * 12 + month;
-        setDirection(nextTotal >= prevTotal ? 'right' : 'left');
-        return { year, month };
-      });
-    },
-    []
-  );
+  const goToMonth = useCallback((year: number, month: number) => {
+    setVisibleMonth((prev) => {
+      const prevTotal = prev.year * 12 + prev.month;
+      const nextTotal = year * 12 + month;
+      setDirection(nextTotal >= prevTotal ? 'right' : 'left');
+      return { year, month };
+    });
+  }, []);
 
   const prevMonth = useCallback(() => {
     setDirection('left');
@@ -421,13 +419,10 @@ export function DateRangePickerTrigger({
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { t } = useSettings();
   const { range, locale, label, open, setOpen, disabled } = useDateRangePicker();
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const press = usePressFeedback(0.98);
 
   const hasSelection = Boolean(range.from || range.to);
   const totalDays = diffDaysYMD(range.from, range.to);
@@ -442,63 +437,64 @@ export function DateRangePickerTrigger({
     return `${formatReadableDate(range.from, locale)}  →  ${formatReadableDate(range.to, locale)}`;
   }, [locale, placeholder, range.from, range.to, t]);
 
+  const isDark = palette.mode === 'dark';
+
   return (
-    <Animated.View style={[animStyle, style]}>
+    <Animated.View style={[press.container, style]}>
       <Pressable
         disabled={disabled}
         onPress={() => setOpen(!open)}
-        onPressIn={() => scale.set(withSpring(0.98, { damping: 50, stiffness: 600 }))}
-        onPressOut={() => scale.set(withSpring(1, { damping: 50, stiffness: 600 }))}
+        {...press.handlers}
         style={[
           styles.trigger,
           {
-            backgroundColor: palette.secondaryCard,
-            borderColor: open ? palette.charcoal : palette.border,
-            opacity: disabled ? 0.55 : 1,
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.72)',
+            borderColor: open
+              ? palette.label
+              : isDark
+                ? 'rgba(255, 255, 255, 0.14)'
+                : 'rgba(0, 0, 0, 0.08)',
+            opacity: disabled ? 0.5 : 1,
           },
         ]}
       >
-        <View style={[styles.triggerIconWrap, { backgroundColor: palette.charcoal }]}>
-          <Icon name="date-range" size={18} color="#FFFFFF" />
+        <View style={[styles.triggerIconWrap, { backgroundColor: palette.groupedBackground }]}>
+          <Symbol name="calendar" size={17} color={palette.label} />
         </View>
 
         <View style={{ flex: 1 }}>
           {label ? (
             <Text
-              style={{
-                fontFamily: fonts.medium,
-                fontSize: 11.5,
-                color: palette.textMuted,
-                marginBottom: 2,
-              }}
+              variant="caption"
+              weight="500"
+              color={palette.secondaryLabel}
+              style={{ marginBottom: 2 }}
             >
               {label}
             </Text>
           ) : null}
           <Text
+            variant="subheadline"
+            weight={hasSelection ? '600' : '400'}
+            color={hasSelection ? palette.label : palette.secondaryLabel}
             numberOfLines={1}
-            style={{
-              fontFamily: hasSelection ? fonts.semibold : fonts.body,
-              fontSize: 13.5,
-              color: hasSelection ? palette.text : palette.textMuted,
-            }}
           >
             {displayText}
           </Text>
         </View>
 
         {totalDays > 0 ? (
-          <View style={[styles.daysCountBadge, { backgroundColor: palette.charcoal }]}>
-            <Text style={{ fontFamily: fonts.heading, fontSize: 11, color: '#FFFFFF' }}>
+          <View style={[styles.daysCountBadge, { backgroundColor: palette.label }]}>
+            <Text variant="caption" weight="700" color={palette.surface}>
               {totalDays}d
             </Text>
           </View>
         ) : null}
 
-        <Icon
-          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-          size={20}
-          color={palette.textMuted}
+        <Symbol
+          name={open ? 'chevronUp' : 'chevronDown'}
+          size={14}
+          color={palette.secondaryLabel}
         />
       </Pressable>
     </Animated.View>
@@ -510,7 +506,7 @@ export function DateRangePickerTrigger({
 /* -------------------------------------------------------------------------- */
 
 export function DateRangePickerContent({
-  radius: cornerRadius = 24,
+  radius: cornerRadius = radii.group,
   shadow = true,
   inline = false,
   style,
@@ -526,23 +522,25 @@ export function DateRangePickerContent({
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { open, setOpen } = useDateRangePicker();
+  const isDark = palette.mode === 'dark';
 
   if (!open) return null;
 
   if (inline) {
     return (
       <Animated.View
-        entering={FadeIn.duration(180)}
-        exiting={FadeOut.duration(140)}
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(160)}
         style={[
           styles.inlineContent,
           {
             borderRadius: cornerRadius,
             backgroundColor: palette.surface,
-            borderColor: palette.border,
-            shadowColor: shadow ? palette.shadow : 'transparent',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.07)',
+            shadowColor: shadow ? (isDark ? '#000000' : palette.glass.shadow) : 'transparent',
+            shadowOpacity: shadow ? (isDark ? 0.35 : 0.08) : 0,
           },
           style,
         ]}
@@ -563,14 +561,15 @@ export function DateRangePickerContent({
       <View style={styles.modalBackdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
         <Animated.View
-          entering={FadeIn.duration(180)}
+          entering={FadeIn.duration(200)}
           style={[
             styles.modalCard,
             {
               borderRadius: cornerRadius,
-              backgroundColor: palette.surfaceElevated,
-              borderColor: palette.border,
-              shadowColor: shadow ? palette.shadow : 'transparent',
+              backgroundColor: palette.surface,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.08)',
+              shadowColor: isDark ? '#000000' : palette.glass.shadow,
+              shadowOpacity: isDark ? 0.45 : 0.16,
             },
             style,
           ]}
@@ -595,9 +594,10 @@ export function DateRangePickerCalendar({
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { showSummary: contextShowSummary } = useDateRangePicker();
   const displaySummary = showSummaryProp !== undefined ? showSummaryProp : contextShowSummary;
+  const isDark = palette.mode === 'dark';
 
   return (
     <View
@@ -605,7 +605,7 @@ export function DateRangePickerCalendar({
         styles.calendarContainer,
         {
           backgroundColor: palette.surface,
-          borderColor: palette.border,
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
         },
         style,
       ]}
@@ -621,59 +621,60 @@ export function DateRangePickerCalendar({
 /* -------------------------------------------------------------------------- */
 
 export function DateRangePickerSummary({ style }: { style?: StyleProp<ViewStyle> }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { t } = useSettings();
   const { range, locale } = useDateRangePicker();
   const totalDays = diffDaysYMD(range.from, range.to);
+  const isDark = palette.mode === 'dark';
 
   return (
     <View
       style={[
         styles.summaryBar,
         {
-          backgroundColor: palette.secondaryCard,
-          borderColor: palette.border,
+          backgroundColor: palette.groupedBackground,
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
         },
         style,
       ]}
     >
       <View style={styles.summaryColumn}>
-        <Text style={[styles.summaryLabel, { color: palette.textMuted }]}>
+        <Text variant="caption" weight="600" color={palette.secondaryLabel}>
           {t('audit.deadline.from')}
         </Text>
         <Text
+          variant="subheadline"
+          weight="600"
+          color={range.from ? palette.label : palette.secondaryLabel}
           numberOfLines={1}
-          style={[
-            styles.summaryValue,
-            { color: range.from ? palette.text : palette.textMuted },
-          ]}
+          style={{ marginTop: 2 }}
         >
           {formatReadableDate(range.from, locale)}
         </Text>
       </View>
 
       <View style={[styles.summaryArrowBadge, { backgroundColor: palette.surface }]}>
-        <Icon name="arrow-forward" size={14} color={palette.textMuted} />
+        <Symbol name="arrowRight" size={13} color={palette.secondaryLabel} />
       </View>
 
       <View style={[styles.summaryColumn, { alignItems: 'flex-end' }]}>
-        <Text style={[styles.summaryLabel, { color: palette.textMuted }]}>
+        <Text variant="caption" weight="600" color={palette.secondaryLabel}>
           {t('audit.deadline.to')}
         </Text>
         <Text
+          variant="subheadline"
+          weight="600"
+          color={range.to ? palette.label : palette.secondaryLabel}
           numberOfLines={1}
-          style={[
-            styles.summaryValue,
-            { color: range.to ? palette.text : palette.textMuted },
-          ]}
+          style={{ marginTop: 2 }}
         >
           {formatReadableDate(range.to, locale)}
         </Text>
       </View>
 
       {totalDays > 0 ? (
-        <View style={[styles.summaryDurationPill, { backgroundColor: palette.charcoal }]}>
-          <Text style={{ fontFamily: fonts.heading, fontSize: 11.5, color: '#FFFFFF' }}>
+        <View style={[styles.summaryDurationPill, { backgroundColor: palette.label }]}>
+          <Text variant="caption" weight="700" color={palette.surface}>
             {totalDays} {totalDays === 1 ? t('audit.deadline.day') : t('audit.deadline.days')}
           </Text>
         </View>
@@ -687,7 +688,7 @@ export function DateRangePickerSummary({ style }: { style?: StyleProp<ViewStyle>
 /* -------------------------------------------------------------------------- */
 
 export function DateRangePickerHeader({ style }: { style?: StyleProp<ViewStyle> }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const {
     visibleMonth,
     prevMonth,
@@ -698,6 +699,8 @@ export function DateRangePickerHeader({ style }: { style?: StyleProp<ViewStyle> 
     setViewMode,
     locale,
   } = useDateRangePicker();
+
+  const isDark = palette.mode === 'dark';
 
   const monthTitle = useMemo(() => {
     const d = new Date(visibleMonth.year, visibleMonth.month, 1, 12, 0, 0);
@@ -720,20 +723,26 @@ export function DateRangePickerHeader({ style }: { style?: StyleProp<ViewStyle> 
           hitSlop={6}
           style={[
             styles.navIconBtn,
-            { backgroundColor: palette.secondaryCard, borderColor: palette.border },
+            {
+              backgroundColor: palette.groupedBackground,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            },
           ]}
         >
-          <Icon name="keyboard-double-arrow-left" size={18} color={palette.text} />
+          <Symbol name="arrowLeft" size={14} color={palette.label} />
         </Pressable>
         <Pressable
           onPress={prevMonth}
           hitSlop={6}
           style={[
             styles.navIconBtn,
-            { backgroundColor: palette.secondaryCard, borderColor: palette.border },
+            {
+              backgroundColor: palette.groupedBackground,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            },
           ]}
         >
-          <Icon name="chevron-left" size={20} color={palette.text} />
+          <Symbol name="chevronLeft" size={14} color={palette.label} />
         </Pressable>
       </View>
 
@@ -742,24 +751,22 @@ export function DateRangePickerHeader({ style }: { style?: StyleProp<ViewStyle> 
         style={[
           styles.monthTitleButton,
           {
-            backgroundColor: viewMode !== 'days' ? palette.charcoal : palette.secondaryCard,
-            borderColor: viewMode !== 'days' ? palette.charcoal : palette.border,
+            backgroundColor: viewMode !== 'days' ? palette.label : palette.groupedBackground,
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
           },
         ]}
       >
         <Text
-          style={{
-            fontFamily: fonts.heading,
-            fontSize: 14.5,
-            color: viewMode !== 'days' ? '#FFFFFF' : palette.text,
-          }}
+          variant="subheadline"
+          weight="600"
+          color={viewMode !== 'days' ? palette.surface : palette.label}
         >
           {monthTitle}
         </Text>
-        <Icon
-          name={viewMode === 'days' ? 'expand-more' : 'expand-less'}
-          size={18}
-          color={viewMode !== 'days' ? '#FFFFFF' : palette.textMuted}
+        <Symbol
+          name={viewMode === 'days' ? 'chevronDown' : 'chevronUp'}
+          size={13}
+          color={viewMode !== 'days' ? palette.surface : palette.secondaryLabel}
         />
       </Pressable>
 
@@ -769,20 +776,26 @@ export function DateRangePickerHeader({ style }: { style?: StyleProp<ViewStyle> 
           hitSlop={6}
           style={[
             styles.navIconBtn,
-            { backgroundColor: palette.secondaryCard, borderColor: palette.border },
+            {
+              backgroundColor: palette.groupedBackground,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            },
           ]}
         >
-          <Icon name="chevron-right" size={20} color={palette.text} />
+          <Symbol name="chevronRight" size={14} color={palette.label} />
         </Pressable>
         <Pressable
           onPress={nextYear}
           hitSlop={6}
           style={[
             styles.navIconBtn,
-            { backgroundColor: palette.secondaryCard, borderColor: palette.border },
+            {
+              backgroundColor: palette.groupedBackground,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            },
           ]}
         >
-          <Icon name="keyboard-double-arrow-right" size={18} color={palette.text} />
+          <Symbol name="arrowRight" size={14} color={palette.label} />
         </Pressable>
       </View>
     </View>
@@ -804,7 +817,7 @@ const WEEKDAY_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const WEEKDAY_ES = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
 
 export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { language } = useSettings();
   const {
     range,
@@ -818,19 +831,19 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
     locale,
   } = useDateRangePicker();
 
+  const isDark = palette.mode === 'dark';
   const todayYMD = useMemo(() => formatYMD(new Date()), []);
   const weekdayLabels = language === 'es' ? WEEKDAY_ES : WEEKDAY_EN;
 
   const weeks = useMemo<CalendarDayCell[][]>(() => {
     const { year, month } = visibleMonth;
     const firstOfMonth = new Date(year, month, 1, 12, 0, 0);
-    const startWeekday = firstOfMonth.getDay(); // 0 (Sun) .. 6 (Sat)
+    const startWeekday = firstOfMonth.getDay();
     const daysInMonth = new Date(year, month + 1, 0, 12, 0, 0).getDate();
     const daysInPrevMonth = new Date(year, month, 0, 12, 0, 0).getDate();
 
     const cells: CalendarDayCell[] = [];
 
-    // Leading days from previous month
     for (let i = startWeekday - 1; i >= 0; i--) {
       const dayNum = daysInPrevMonth - i;
       const d = new Date(year, month - 1, dayNum, 12, 0, 0);
@@ -843,7 +856,6 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
       });
     }
 
-    // Current month days
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
       const d = new Date(year, month, dayNum, 12, 0, 0);
       const ymd = formatYMD(d);
@@ -855,7 +867,6 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
       });
     }
 
-    // Trailing days to complete 6 rows (42 cells) for consistent calendar height
     const remaining = 42 - cells.length;
     for (let dayNum = 1; dayNum <= remaining; dayNum++) {
       const d = new Date(year, month + 1, dayNum, 12, 0, 0);
@@ -875,7 +886,6 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
     return rows;
   }, [todayYMD, visibleMonth]);
 
-  // Direct Month & Year selector view
   if (viewMode === 'months' || viewMode === 'years') {
     const months = Array.from({ length: 12 }, (_, idx) => {
       const d = new Date(visibleMonth.year, idx, 1, 12, 0, 0);
@@ -891,7 +901,6 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
 
     return (
       <Animated.View entering={FadeIn.duration(160)} style={[styles.pickerSubGrid, style]}>
-        {/* Year strip */}
         <View style={styles.yearGrid}>
           {years.map((yr) => {
             const active = yr === visibleMonth.year;
@@ -902,17 +911,15 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
                 style={[
                   styles.yearChip,
                   {
-                    backgroundColor: active ? palette.charcoal : palette.secondaryCard,
-                    borderColor: active ? palette.charcoal : palette.border,
+                    backgroundColor: active ? palette.label : palette.groupedBackground,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
                   },
                 ]}
               >
                 <Text
-                  style={{
-                    fontFamily: active ? fonts.heading : fonts.medium,
-                    fontSize: 13,
-                    color: active ? '#FFFFFF' : palette.text,
-                  }}
+                  variant="caption"
+                  weight={active ? '700' : '500'}
+                  color={active ? palette.surface : palette.label}
                 >
                   {yr}
                 </Text>
@@ -921,7 +928,6 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
           })}
         </View>
 
-        {/* 12 Months grid */}
         <View style={styles.monthGrid}>
           {months.map((m) => {
             const active = m.index === visibleMonth.month;
@@ -935,17 +941,15 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
                 style={[
                   styles.monthCell,
                   {
-                    backgroundColor: active ? palette.charcoal : palette.secondaryCard,
-                    borderColor: active ? palette.charcoal : palette.border,
+                    backgroundColor: active ? palette.label : palette.groupedBackground,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
                   },
                 ]}
               >
                 <Text
-                  style={{
-                    fontFamily: active ? fonts.heading : fonts.semibold,
-                    fontSize: 13.5,
-                    color: active ? '#FFFFFF' : palette.text,
-                  }}
+                  variant="subheadline"
+                  weight={active ? '700' : '600'}
+                  color={active ? palette.surface : palette.label}
                 >
                   {m.label}
                 </Text>
@@ -962,24 +966,16 @@ export function DateRangePickerGrid({ style }: { style?: StyleProp<ViewStyle> })
 
   return (
     <View style={[styles.gridContainer, style]}>
-      {/* Weekday Header Row */}
       <View style={styles.weekdayRow}>
         {weekdayLabels.map((dayName) => (
           <View key={dayName} style={styles.weekdayCell}>
-            <Text
-              style={{
-                fontFamily: fonts.semibold,
-                fontSize: 12,
-                color: palette.textMuted,
-              }}
-            >
+            <Text variant="caption" weight="600" color={palette.secondaryLabel}>
               {dayName}
             </Text>
           </View>
         ))}
       </View>
 
-      {/* Animated Month Page */}
       <Animated.View
         key={`${visibleMonth.year}-${visibleMonth.month}`}
         entering={enteringAnim}
@@ -1038,18 +1034,17 @@ function DayCellButton({
   disabled: boolean;
   onPress: () => void;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const rangeBandColor =
-    palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.10)' : 'rgba(36, 36, 38, 0.09)';
+    palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(28, 28, 30, 0.08)';
 
   return (
     <View style={styles.dayCellOuter}>
-      {/* Continuous range connector strip */}
       {isInRange ? (
         <View style={[styles.rangeBandFull, { backgroundColor: rangeBandColor }]} />
       ) : null}
@@ -1069,36 +1064,32 @@ function DayCellButton({
           style={[
             styles.dayButton,
             isSelectedEndpoint && {
-              backgroundColor: palette.charcoal,
-              shadowColor: palette.shadow,
-              shadowOpacity: 0.2,
-              shadowRadius: 6,
-              shadowOffset: { width: 0, height: 3 },
+              backgroundColor: palette.label,
+              shadowColor: palette.mode === 'dark' ? '#000000' : palette.glass.shadow,
+              shadowOpacity: 0.18,
+              shadowRadius: 5,
+              shadowOffset: { width: 0, height: 2 },
               elevation: 3,
             },
             !isSelectedEndpoint &&
               cell.isToday && {
                 borderWidth: 1.5,
-                borderColor: palette.charcoal,
+                borderColor: palette.label,
               },
           ]}
         >
           <Text
-            style={{
-              fontFamily: isSelectedEndpoint
-                ? fonts.heading
-                : cell.isToday
-                  ? fonts.heading
-                  : fonts.medium,
-              fontSize: 13.5,
-              color: isSelectedEndpoint
-                ? '#FFFFFF'
+            variant="caption"
+            weight={isSelectedEndpoint || cell.isToday ? '700' : '500'}
+            color={
+              isSelectedEndpoint
+                ? palette.surface
                 : disabled
-                  ? palette.textMuted + '55'
+                  ? palette.placeholder
                   : !cell.inCurrentMonth
-                    ? palette.textMuted + '88'
-                    : palette.text,
-            }}
+                    ? palette.secondaryLabel
+                    : palette.label
+            }
           >
             {cell.dayNumber}
           </Text>
@@ -1107,7 +1098,7 @@ function DayCellButton({
               style={[
                 styles.todayDot,
                 {
-                  backgroundColor: isSelectedEndpoint ? '#FFFFFF' : palette.charcoal,
+                  backgroundColor: isSelectedEndpoint ? palette.surface : palette.label,
                 },
               ]}
             />
@@ -1155,33 +1146,40 @@ export function DateRangePickerPreset({
   label: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { range, selectPreset, disabled } = useDateRangePicker();
+  const press = usePressFeedback(0.95);
   const isActive = range.from === value.from && range.to === value.to && Boolean(value.from);
+  const isDark = palette.mode === 'dark';
 
   return (
-    <Pressable
-      disabled={disabled}
-      onPress={() => selectPreset(value)}
-      style={[
-        styles.presetChip,
-        {
-          backgroundColor: isActive ? palette.charcoal : palette.secondaryCard,
-          borderColor: isActive ? palette.charcoal : palette.border,
-        },
-        style,
-      ]}
-    >
-      <Text
-        style={{
-          fontFamily: isActive ? fonts.heading : fonts.medium,
-          fontSize: 12.5,
-          color: isActive ? '#FFFFFF' : palette.text,
-        }}
+    <Animated.View style={press.container}>
+      <Pressable
+        disabled={disabled}
+        onPress={() => selectPreset(value)}
+        {...press.handlers}
+        style={[
+          styles.presetChip,
+          {
+            backgroundColor: isActive ? palette.label : palette.groupedBackground,
+            borderColor: isActive
+              ? palette.label
+              : isDark
+                ? 'rgba(255, 255, 255, 0.08)'
+                : 'rgba(0, 0, 0, 0.06)',
+          },
+          style,
+        ]}
       >
-        {label}
-      </Text>
-    </Pressable>
+        <Text
+          variant="caption"
+          weight={isActive ? '700' : '500'}
+          color={isActive ? palette.surface : palette.label}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -1196,16 +1194,23 @@ export function DateRangePickerFooter({
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
-  const palette = useTheme();
+  const palette = usePalette();
+  const isDark = palette.mode === 'dark';
   return (
-    <View style={[styles.footerContainer, { borderTopColor: palette.border }, style]}>
+    <View
+      style={[
+        styles.footerContainer,
+        { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' },
+        style,
+      ]}
+    >
       {children}
     </View>
   );
 }
 
 export function DateRangePickerSelection({ style }: { style?: StyleProp<ViewStyle> }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { t } = useSettings();
   const { range, locale } = useDateRangePicker();
   const days = diffDaysYMD(range.from, range.to);
@@ -1222,15 +1227,13 @@ export function DateRangePickerSelection({ style }: { style?: StyleProp<ViewStyl
 
   return (
     <View style={[styles.selectionWrap, style]}>
-      <Icon name="event-available" size={16} color={palette.textMuted} />
+      <Symbol name="calendar" size={14} color={palette.secondaryLabel} />
       <Text
+        variant="caption"
+        weight="500"
+        color={range.from ? palette.label : palette.secondaryLabel}
         numberOfLines={1}
-        style={{
-          fontFamily: fonts.medium,
-          fontSize: 12.5,
-          color: range.from ? palette.text : palette.textMuted,
-          flexShrink: 1,
-        }}
+        style={{ flexShrink: 1 }}
       >
         {text}
       </Text>
@@ -1239,36 +1242,35 @@ export function DateRangePickerSelection({ style }: { style?: StyleProp<ViewStyl
 }
 
 export function DateRangePickerClear({ style }: { style?: StyleProp<ViewStyle> }) {
-  const palette = useTheme();
+  const palette = usePalette();
   const { t } = useSettings();
   const { range, clear, disabled } = useDateRangePicker();
+  const press = usePressFeedback(0.95);
+  const isDark = palette.mode === 'dark';
 
   if (!range.from && !range.to) return null;
 
   return (
-    <Pressable
-      disabled={disabled}
-      onPress={clear}
-      style={[
-        styles.clearBtn,
-        {
-          backgroundColor: palette.secondaryCard,
-          borderColor: palette.border,
-        },
-        style,
-      ]}
-    >
-      <Icon name="restart-alt" size={14} color={palette.textMuted} />
-      <Text
-        style={{
-          fontFamily: fonts.semibold,
-          fontSize: 12,
-          color: palette.text,
-        }}
+    <Animated.View style={press.container}>
+      <Pressable
+        disabled={disabled}
+        onPress={clear}
+        {...press.handlers}
+        style={[
+          styles.clearBtn,
+          {
+            backgroundColor: palette.groupedBackground,
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+          },
+          style,
+        ]}
       >
-        {t('audit.deadline.clear')}
-      </Text>
-    </Pressable>
+        <Symbol name="refresh" size={12} color={palette.secondaryLabel} />
+        <Text variant="caption" weight="600" color={palette.label}>
+          {t('audit.deadline.clear')}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -1327,7 +1329,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: radius.md,
+    borderRadius: radii.group,
     borderWidth: 1,
   },
   triggerIconWrap: {
@@ -1339,34 +1341,32 @@ const styles = StyleSheet.create({
   },
   daysCountBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
   },
   inlineContent: {
     marginTop: 10,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowOpacity: 0.08,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(18, 18, 22, 0.55)',
+    backgroundColor: 'rgba(10, 12, 15, 0.65)',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
   modalCard: {
     borderWidth: 1,
     overflow: 'hidden',
-    shadowOpacity: 0.22,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },
     elevation: 14,
   },
   calendarContainer: {
-    borderRadius: 22,
+    borderRadius: radii.group,
     borderWidth: 1,
     padding: 14,
     gap: 12,
@@ -1375,7 +1375,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 16,
+    borderRadius: radii.group - 2,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1383,17 +1383,6 @@ const styles = StyleSheet.create({
   },
   summaryColumn: {
     flex: 1,
-  },
-  summaryLabel: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  summaryValue: {
-    fontFamily: fonts.heading,
-    fontSize: 13,
-    marginTop: 2,
   },
   summaryArrowBadge: {
     width: 26,
@@ -1404,8 +1393,8 @@ const styles = StyleSheet.create({
   },
   summaryDurationPill: {
     paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
     marginLeft: 4,
   },
   headerRow: {
@@ -1430,10 +1419,10 @@ const styles = StyleSheet.create({
   monthTitleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
     borderWidth: 1,
   },
   presetsRow: {
@@ -1444,8 +1433,8 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
     borderWidth: 1,
   },
   gridContainer: {
@@ -1498,18 +1487,18 @@ const styles = StyleSheet.create({
     bottom: 4,
   },
   dayButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
   todayDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
     position: 'absolute',
-    bottom: 4,
+    bottom: 3,
   },
   pickerSubGrid: {
     gap: 12,
@@ -1536,7 +1525,7 @@ const styles = StyleSheet.create({
   },
   monthCell: {
     width: '31%',
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
@@ -1563,8 +1552,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+    paddingVertical: 5,
+    borderRadius: radii.pill,
     borderWidth: 1,
   },
 });
