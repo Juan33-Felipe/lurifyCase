@@ -1,6 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { caseService } from '../services/caseService';
-import { AuditReport, Case, CanvasSnapshot, CreateCaseRequest } from '../types/api.types';
+import {
+  AuditReport,
+  Case,
+  CanvasSnapshot,
+  CaseDeadline,
+  CreateCaseRequest,
+  DeadlinePriority,
+} from '../types/api.types';
 import { useSettings } from './SettingsContext';
 import {
   translateAudit,
@@ -9,10 +17,20 @@ import {
   translateCases,
 } from '../services/caseTranslationService';
 
+const DEADLINES_STORAGE_KEY = '@iurifycase/deadlines_v1';
+
 interface Remote<T> {
   data: T | null;
   loading: boolean;
   error: boolean;
+}
+
+export interface AddDeadlineInput {
+  title: string;
+  notes?: string;
+  from: string;
+  to: string;
+  priority?: DeadlinePriority;
 }
 
 interface CasesContextValue {
@@ -26,6 +44,10 @@ interface CasesContextValue {
   applyCanvas: (snapshot: CanvasSnapshot) => void;
   audit: Remote<AuditReport>;
   runAudit: () => Promise<void>;
+  deadlines: CaseDeadline[];
+  addDeadline: (input: AddDeadlineInput) => Promise<CaseDeadline | null>;
+  toggleDeadline: (deadlineId: string) => Promise<void>;
+  removeDeadline: (deadlineId: string) => Promise<void>;
 }
 
 const CasesContext = createContext<CasesContextValue | null>(null);
@@ -44,6 +66,81 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   const [canvasState, setCanvasState] = useState<{ caseId: string; snapshot: CanvasSnapshot | null; error: boolean } | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [auditState, setAuditState] = useState<{ caseId: string; report: AuditReport | null; loading: boolean; error: boolean } | null>(null);
+  const [allDeadlines, setAllDeadlines] = useState<CaseDeadline[]>([]);
+
+  // Load persisted deadlines on mount
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(DEADLINES_STORAGE_KEY)
+      .then((raw) => {
+        if (!active || !raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setAllDeadlines(parsed);
+          }
+        } catch {
+          // ignore malformed storage
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const persistDeadlines = useCallback(async (next: CaseDeadline[]) => {
+    setAllDeadlines(next);
+    try {
+      await AsyncStorage.setItem(DEADLINES_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  const addDeadline = useCallback(
+    async (input: AddDeadlineInput): Promise<CaseDeadline | null> => {
+      if (!selectedId) return null;
+      const newDeadline: CaseDeadline = {
+        id: `dl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        caseId: selectedId,
+        title: input.title.trim(),
+        notes: input.notes?.trim() || undefined,
+        from: input.from,
+        to: input.to,
+        priority: input.priority ?? 'MEDIUM',
+        completed: false,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [newDeadline, ...allDeadlines];
+      await persistDeadlines(next);
+      return newDeadline;
+    },
+    [allDeadlines, persistDeadlines, selectedId]
+  );
+
+  const toggleDeadline = useCallback(
+    async (deadlineId: string) => {
+      const next = allDeadlines.map((d) =>
+        d.id === deadlineId ? { ...d, completed: !d.completed } : d
+      );
+      await persistDeadlines(next);
+    },
+    [allDeadlines, persistDeadlines]
+  );
+
+  const removeDeadline = useCallback(
+    async (deadlineId: string) => {
+      const next = allDeadlines.filter((d) => d.id !== deadlineId);
+      await persistDeadlines(next);
+    },
+    [allDeadlines, persistDeadlines]
+  );
+
+  const caseDeadlines = useMemo(
+    () => allDeadlines.filter((d) => d.caseId === selectedId),
+    [allDeadlines, selectedId]
+  );
 
   const loadCases = useCallback(async () => {
     try {
@@ -81,8 +178,29 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     caseService
       .getCanvas(selectedId)
-      .then((snapshot) => active && setCanvasState({ caseId: selectedId, snapshot, error: false }))
-      .catch(() => active && setCanvasState({ caseId: selectedId, snapshot: null, error: true }));
+      .then((snapshot) => {
+        if (!active) return;
+        setCanvasState((prev) => {
+          if (
+            prev &&
+            prev.caseId === selectedId &&
+            prev.snapshot &&
+            (prev.snapshot.version > snapshot.version ||
+              prev.snapshot.canvas.nodes.length > snapshot.canvas.nodes.length)
+          ) {
+            return prev;
+          }
+          return { caseId: selectedId, snapshot, error: false };
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setCanvasState((prev) =>
+          prev && prev.caseId === selectedId && prev.snapshot
+            ? prev
+            : { caseId: selectedId, snapshot: null, error: true }
+        );
+      });
     return () => {
       active = false;
     };
@@ -184,6 +302,10 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     applyCanvas,
     audit: displayAudit,
     runAudit,
+    deadlines: caseDeadlines,
+    addDeadline,
+    toggleDeadline,
+    removeDeadline,
   };
 
   return <CasesContext.Provider value={value}>{children}</CasesContext.Provider>;
