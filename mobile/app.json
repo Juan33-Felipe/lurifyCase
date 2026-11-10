@@ -26,7 +26,8 @@
       "@react-native-vector-icons/material-icons",
       "expo-secure-store",
       "expo-local-authentication",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-audio"
     ]
   }
 }
