@@ -29,6 +29,30 @@ export { QuickActionTaskCard } from './QuickActionTaskCard';
 export { TimelineAuditItem } from './TimelineAuditItem';
 export { DateStripSelector, toDateKey } from './DateStripSelector';
 export { BottomTabBar, Tab } from './BottomTabBar';
+export {
+  DateRangePicker,
+  DateRangePickerCalendar,
+  DateRangePickerClear,
+  DateRangePickerContent,
+  DateRangePickerDropdown,
+  DateRangePickerFooter,
+  DateRangePickerGrid,
+  DateRangePickerHeader,
+  DateRangePickerPreset,
+  DateRangePickerPresets,
+  DateRangePickerSelection,
+  DateRangePickerSummary,
+  DateRangePickerTrigger,
+  useDateRangePicker,
+  formatYMD,
+  parseYMD,
+  ymdToLocalDate,
+  addDaysYMD,
+  diffDaysYMD,
+  formatReadableDate,
+  formatShortDate,
+} from './DateRangePicker';
+export type { DateRange, DateRangePreset, DateRangePickerProps } from './DateRangePicker';
 
 type IconName = React.ComponentProps<typeof Icon>['name'];
 
