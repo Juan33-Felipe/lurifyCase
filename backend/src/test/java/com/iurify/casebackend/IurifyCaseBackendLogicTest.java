@@ -382,4 +382,14 @@ class IurifyCaseBackendLogicTest {
                 authService.register("Valid Name", "valid@example.com", "")
         );
     }
+
+    @Test
+    void shouldReturnEmptyCasesListForNewlyCreatedAccount() {
+        User newUser = authService.register("New Attorney", "new.attorney@example.com", "Secret123!");
+        assertNotNull(newUser.getId());
+
+        List<Case> userCases = caseService.listCases(newUser.getId(), null, null);
+        assertNotNull(userCases);
+        assertTrue(userCases.isEmpty(), "Newly created account should have no cases");
+    }
 }
