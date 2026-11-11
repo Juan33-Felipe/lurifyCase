@@ -4,7 +4,11 @@
 import { execSync } from 'node:child_process';
 
 const PORTS = { 8080: 'backend', 8081: 'Expo' };
-const isOurs = (cmd) => /IurifyCaseApplication/.test(cmd) || /lurifyCase[\/]mobile[\/]node_modules/i.test(cmd);
+const isOurs = (cmd) =>
+  /IurifyCase/i.test(cmd) ||
+  /lurifyCase/i.test(cmd) ||
+  /iurifycase-backend/i.test(cmd) ||
+  /mobile[/\\]node_modules/i.test(cmd);
 const sh = (c) => execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
 const ownerWin = (port) => {

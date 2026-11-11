@@ -1,10 +1,18 @@
 // Arranca Expo apuntando la app al backend por la IP de la red local,
 // para que funcione igual en web, emulador y teléfono físico con Expo Go.
 // Si EXPO_PUBLIC_API_URL ya está definida, se respeta.
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+
+// Si hay un emulador o dispositivo Android conectado por adb, mapear el puerto 8080
+try {
+  const adb = process.env.LOCALAPPDATA
+    ? join(process.env.LOCALAPPDATA, 'Android', 'Sdk', 'platform-tools', 'adb.exe')
+    : 'adb';
+  execSync(`"${adb}" reverse tcp:8080 tcp:8080`, { stdio: 'ignore' });
+} catch {}
 
 const lanIp = () => {
   for (const [name, addrs] of Object.entries(networkInterfaces())) {
@@ -18,7 +26,7 @@ const lanIp = () => {
 
 const env = { ...process.env };
 if (!env.EXPO_PUBLIC_API_URL) {
-  env.EXPO_PUBLIC_API_URL = `http://${lanIp()}:8080/api/v1`;
+  env.EXPO_PUBLIC_API_URL = 'https://lurifycase.onrender.com/api/v1';
 }
 console.log(`API de la app: ${env.EXPO_PUBLIC_API_URL}`);
 
