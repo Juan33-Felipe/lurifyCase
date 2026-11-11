@@ -22,6 +22,7 @@ import {
 
 const DEADLINES_STORAGE_KEY = '@iurifycase/deadlines_v1';
 const NARRATIVES_STORAGE_KEY = '@iurifycase/narratives_v2';
+const CASES_STORAGE_KEY = '@iurifycase/cases_cache_v2';
 
 interface Remote<T> {
   data: T | null;
@@ -79,9 +80,25 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   const [allDeadlines, setAllDeadlines] = useState<CaseDeadline[]>([]);
   const [allNarratives, setAllNarratives] = useState<Record<string, CaseNarrativeEntry[]>>(mockNarrativeEntries);
 
-  // Load persisted deadlines and narratives on mount
+  // Load persisted deadlines, narratives, and cached cases on mount
   useEffect(() => {
     let active = true;
+
+    AsyncStorage.getItem(CASES_STORAGE_KEY)
+      .then((raw) => {
+        if (!active || !raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCases((prev) => (prev.data ? prev : { data: parsed, loading: false, error: false }));
+            setSelectedId((prev) => prev ?? parsed[0]?.id ?? null);
+          }
+        } catch {
+          // ignore malformed storage
+        }
+      })
+      .catch(() => {});
+
     AsyncStorage.getItem(DEADLINES_STORAGE_KEY)
       .then((raw) => {
         if (!active || !raw) return;
@@ -206,21 +223,38 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loadCases = useCallback(async () => {
-    try {
-      const res = await caseService.getCases();
-      // Garantizar que cuentas nuevas solo vean sus propios expedientes
-      const userCases = userId
-        ? res.items.filter(
-            (c) =>
-              c.userId &&
-              c.userId.toString().toLowerCase() === userId.toString().toLowerCase()
-          )
-        : [];
-      setCases({ data: userCases, loading: false, error: false });
-      setSelectedId((cur) => (cur && userCases.some((c) => c.id === cur) ? cur : userCases[0]?.id ?? null));
-    } catch {
-      setCases((p) => ({ ...p, loading: false, error: true }));
+    let attempts = 0;
+    while (attempts <= 2) {
+      try {
+        const res = await caseService.getCases();
+        // Garantizar que cuentas nuevas solo vean sus propios expedientes, respetando expedientes existentes
+        const userCases =
+          userId && res.items.some((c) => c.userId)
+            ? res.items.filter(
+                (c) =>
+                  !c.userId ||
+                  c.userId.toString().toLowerCase() === userId.toString().toLowerCase()
+              )
+            : res.items;
+
+        setCases({ data: userCases, loading: false, error: false });
+        if (userCases.length > 0) {
+          AsyncStorage.setItem(CASES_STORAGE_KEY, JSON.stringify(userCases)).catch(() => {});
+        }
+        setSelectedId((cur) => (cur && userCases.some((c) => c.id === cur) ? cur : userCases[0]?.id ?? null));
+        return;
+      } catch {
+        attempts += 1;
+        if (attempts <= 2) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
     }
+    setCases((p) =>
+      p.data && p.data.length > 0
+        ? { ...p, loading: false, error: false }
+        : { ...p, loading: false, error: true }
+    );
   }, [userId]);
 
   const refreshCases = useCallback(async () => {
@@ -230,21 +264,42 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    caseService
-      .getCases()
-      .then((res) => {
-        if (!active) return;
-        const userCases = userId
-          ? res.items.filter(
-              (c) =>
-                c.userId &&
-                c.userId.toString().toLowerCase() === userId.toString().toLowerCase()
-            )
-          : [];
-        setCases({ data: userCases, loading: false, error: false });
-        setSelectedId(userCases[0]?.id ?? null);
-      })
-      .catch(() => active && setCases((p) => ({ ...p, loading: false, error: true })));
+    (async () => {
+      let attempts = 0;
+      while (attempts <= 2 && active) {
+        try {
+          const res = await caseService.getCases();
+          if (!active) return;
+          const userCases =
+            userId && res.items.some((c) => c.userId)
+              ? res.items.filter(
+                  (c) =>
+                    !c.userId ||
+                    c.userId.toString().toLowerCase() === userId.toString().toLowerCase()
+                )
+              : res.items;
+
+          setCases({ data: userCases, loading: false, error: false });
+          if (userCases.length > 0) {
+            AsyncStorage.setItem(CASES_STORAGE_KEY, JSON.stringify(userCases)).catch(() => {});
+          }
+          setSelectedId((cur) => (cur && userCases.some((c) => c.id === cur) ? cur : userCases[0]?.id ?? null));
+          return;
+        } catch {
+          attempts += 1;
+          if (attempts <= 2 && active) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+      }
+      if (active) {
+        setCases((p) =>
+          p.data && p.data.length > 0
+            ? { ...p, loading: false, error: false }
+            : { ...p, loading: false, error: true }
+        );
+      }
+    })();
     return () => {
       active = false;
     };
@@ -295,7 +350,6 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
   }, [selectedId, reloadTick]);
 
   const reloadCanvas = useCallback(() => {
-    setCanvasState(null);
     setReloadTick((n) => n + 1);
   }, []);
 
@@ -324,12 +378,16 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
         updatedAt: withUser.createdAt || new Date().toISOString(),
         canvas: { nodes: [], edges: [] },
       };
-      setCases((p) => ({
-        ...p,
-        data: [withUser, ...(p.data ?? [])],
-        loading: false,
-        error: false,
-      }));
+      setCases((p) => {
+        const nextData = [withUser, ...(p.data ?? [])];
+        AsyncStorage.setItem(CASES_STORAGE_KEY, JSON.stringify(nextData)).catch(() => {});
+        return {
+          ...p,
+          data: nextData,
+          loading: false,
+          error: false,
+        };
+      });
       setCanvasState({ caseId: withUser.id, snapshot: initialSnapshot, error: false });
       setSelectedId(withUser.id);
       return withUser;
@@ -337,10 +395,59 @@ export function CasesProvider({ children }: { children: React.ReactNode }) {
     [userId]
   );
 
-  const applyCanvas = useCallback((snapshot: CanvasSnapshot) => {
-    setCanvasState({ caseId: snapshot.caseId, snapshot, error: false });
+  const applyCanvas = useCallback((payload: any) => {
+    if (!payload) return;
+    const targetCaseId =
+      payload.caseId ||
+      payload.snapshot?.caseId ||
+      selectedId;
+
+    if (!targetCaseId) return;
+
+    let snapshot: CanvasSnapshot;
+    if (payload.snapshot && payload.snapshot.canvas) {
+      snapshot = {
+        caseId: targetCaseId,
+        version: payload.snapshot.version ?? payload.version ?? 2,
+        updatedAt: payload.snapshot.updatedAt || new Date().toISOString(),
+        canvas: {
+          nodes: Array.isArray(payload.snapshot.canvas.nodes) ? payload.snapshot.canvas.nodes : [],
+          edges: Array.isArray(payload.snapshot.canvas.edges) ? payload.snapshot.canvas.edges : [],
+        },
+      };
+    } else if (payload.canvas && Array.isArray(payload.canvas.nodes)) {
+      snapshot = {
+        caseId: targetCaseId,
+        version: payload.version ?? 2,
+        updatedAt: payload.updatedAt || new Date().toISOString(),
+        canvas: {
+          nodes: payload.canvas.nodes,
+          edges: Array.isArray(payload.canvas.edges) ? payload.canvas.edges : [],
+        },
+      };
+    } else if (Array.isArray(payload.nodes)) {
+      snapshot = {
+        caseId: targetCaseId,
+        version: payload.version ?? 2,
+        updatedAt: payload.updatedAt || new Date().toISOString(),
+        canvas: {
+          nodes: payload.nodes,
+          edges: Array.isArray(payload.edges) ? payload.edges : [],
+        },
+      };
+    } else {
+      snapshot = {
+        ...(payload as CanvasSnapshot),
+        caseId: targetCaseId,
+      };
+      if (!snapshot.canvas) {
+        snapshot.canvas = { nodes: [], edges: [] };
+      }
+    }
+
+    setCanvasState({ caseId: targetCaseId, snapshot, error: false });
     setAuditState(null);
-  }, []);
+  }, [selectedId]);
 
   const runAudit = useCallback(async () => {
     if (!selectedId || !canvas.data) return;
