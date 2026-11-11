@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -29,7 +29,7 @@ import { useSettings } from '../context/SettingsContext';
 import { caseService } from '../services/caseService';
 import { geminiService } from '../services/geminiService';
 import { RecordedAudioResult, useVoiceRecorder } from '../hooks/useVoiceRecorder';
-import { CanvasNode, NodeType } from '../types/api.types';
+import { AuditAlert, CanvasNode, CanvasSnapshot, NodeType } from '../types/api.types';
 
 const NODE_TYPES: NodeType[] = ['FACT', 'EVIDENCE', 'LAW', 'JURISPRUDENCE'];
 
@@ -42,6 +42,8 @@ const NODE_SYMBOLS: Record<NodeType, SymbolKey> = {
 
 /**
  * Tarjeta de elemento procesal (Hecho, Prueba, Ley, Jurisprudencia) con estilo Apple.
+ * Cuando está colapsada muestra únicamente el título y metadatos.
+ * Al desplegarse muestra la información adjunta por el usuario y el análisis con IA.
  */
 function AppleNodeCard({
   node,
@@ -52,6 +54,9 @@ function AppleNodeCard({
   originLabel,
   relationsTitle,
   relationLabel,
+  auditAlerts,
+  caseTitle,
+  language,
 }: {
   node: CanvasNode;
   active: boolean;
@@ -61,10 +66,48 @@ function AppleNodeCard({
   originLabel: string;
   relationsTitle: string;
   relationLabel: (type: string) => string;
+  auditAlerts?: AuditAlert[];
+  caseTitle?: string;
+  language: 'es' | 'en';
 }) {
   const palette = usePalette();
   const press = usePressFeedback(0.98);
   const iconName = NODE_SYMBOLS[node.type];
+
+  const [deepAnalysis, setDeepAnalysis] = useState<{
+    relevanceLabel: string;
+    strategicInsight: string;
+    probativeWeight: string;
+    recommendation: string;
+    admissibility: string;
+  } | null>(null);
+  const [loadingDeep, setLoadingDeep] = useState(false);
+
+  const initialAnalysis = useMemo(
+    () => geminiService.getInstantNodeAnalysis(node, language),
+    [node, language]
+  );
+
+  const currentAnalysis = deepAnalysis || initialAnalysis;
+
+  const handleDeepen = async () => {
+    if (loadingDeep) return;
+    setLoadingDeep(true);
+    try {
+      const res = await geminiService.analyzeCaseNode(
+        node,
+        caseTitle || (language === 'es' ? 'Expediente' : 'Docket'),
+        language
+      );
+      setDeepAnalysis(res);
+    } catch {
+      // Se mantiene el análisis preliminar instantáneo
+    } finally {
+      setLoadingDeep(false);
+    }
+  };
+
+  const attachedContent = (node.content || (node as any).summary || '').trim();
 
   return (
     <Animated.View style={press.container}>
@@ -83,7 +126,7 @@ function AppleNodeCard({
                 : 'rgba(28,28,30,0.18)'
               : palette.separator,
             shadowColor: palette.mode === 'dark' ? '#000000' : palette.glass.shadow,
-            shadowOpacity: active ? 0.1 : 0.04,
+            shadowOpacity: active ? 0.08 : 0.03,
           },
         ]}
       >
@@ -103,53 +146,217 @@ function AppleNodeCard({
           <Symbol name={active ? 'chevronUp' : 'chevronDown'} size={15} color={palette.secondaryLabel} />
         </View>
 
-        {/* Contenido / descripción del elemento */}
-        <Text
-          variant="subheadline"
-          color={palette.secondaryLabel}
-          numberOfLines={active ? undefined : 2}
-          style={styles.nodeContent}
-        >
-          {node.content || (node as any).summary || ''}
-        </Text>
+        {/* Contenido desplegable: solo visible al tocar la card */}
+        {active && (
+          <View style={styles.expandedContent}>
+            {/* 1. Información adjunta por el usuario a este elemento / prueba */}
+            <View
+              style={[
+                styles.attachedInfoBox,
+                {
+                  backgroundColor: palette.groupedBackground,
+                  borderColor: palette.separator,
+                },
+              ]}
+            >
+              <View style={styles.sectionHeaderRow}>
+                <Symbol name="doc" size={13} color={palette.secondaryLabel} />
+                <Text variant="caption" weight="700" color={palette.secondaryLabel}>
+                  {language === 'es' ? 'INFORMACIÓN ADJUNTA' : 'ATTACHED INFORMATION'}
+                </Text>
+              </View>
+              <Text variant="subheadline" color={palette.label} style={styles.attachedText}>
+                {attachedContent || (language === 'es' ? 'Sin información adicional adjunta.' : 'No additional information attached.')}
+              </Text>
+            </View>
 
-        {/* Relaciones con otros elementos cuando está desplegado */}
-        {active && relations.length > 0 && (
-          <View style={styles.relationsWrapper}>
-            <Text variant="footnote" weight="600" color={palette.label} style={{ marginBottom: 6 }}>
-              {relationsTitle}
-            </Text>
-            {relations.map((r) => {
-              const isContradiction = r.type === 'CONTRADICTS';
-              return (
-                <View
-                  key={r.id}
-                  style={[
-                    styles.relationBadge,
-                    {
-                      backgroundColor: isContradiction
-                        ? palette.mode === 'dark' ? 'rgba(255,69,58,0.2)' : 'rgba(217,48,54,0.1)'
-                        : palette.groupedBackground,
-                      borderColor: isContradiction ? palette.danger : palette.separator,
-                    },
-                  ]}
-                >
+            {/* 2. Sección de Análisis con IA (Valoración procesal) con acento tornasol */}
+            <View
+              style={[
+                styles.aiAnalysisBox,
+                {
+                  backgroundColor:
+                    palette.mode === 'dark'
+                      ? 'rgba(98, 115, 64, 0.15)'
+                      : 'rgba(160, 189, 84, 0.08)',
+                  borderColor:
+                    palette.mode === 'dark'
+                      ? 'rgba(160, 189, 84, 0.40)'
+                      : 'rgba(148, 181, 73, 0.48)',
+                },
+              ]}
+            >
+              <View style={styles.aiHeaderRow}>
+                <View style={styles.aiHeaderTitleGroup}>
                   <Symbol
-                    name={r.outgoing ? 'arrowRight' : 'arrowLeft'}
-                    size={13}
-                    color={isContradiction ? palette.danger : palette.label}
+                    name="sparkles"
+                    size={15}
+                    color={palette.mode === 'dark' ? '#C5DF7C' : '#5A7723'}
                   />
                   <Text
                     variant="caption"
-                    weight="500"
-                    color={isContradiction ? palette.danger : palette.label}
-                    style={{ flex: 1 }}
+                    weight="700"
+                    color={palette.mode === 'dark' ? '#D4EBA4' : '#465F19'}
                   >
-                    {relationLabel(r.type)} • {r.other?.title ?? '—'}
+                    {language === 'es' ? 'ANÁLISIS CON IA' : 'AI CASE ANALYSIS'}
                   </Text>
                 </View>
-              );
-            })}
+
+                {/* Badge de Pertinencia */}
+                <View
+                  style={[
+                    styles.aiRelevancePill,
+                    {
+                      backgroundColor:
+                        palette.mode === 'dark'
+                          ? 'rgba(160, 189, 84, 0.22)'
+                          : 'rgba(160, 189, 84, 0.16)',
+                    },
+                  ]}
+                >
+                  <Text
+                    variant="caption"
+                    weight="700"
+                    color={palette.mode === 'dark' ? '#E4F5BD' : '#3D5414'}
+                  >
+                    {currentAnalysis.relevanceLabel}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Dictamen y Criterio Estratégico IA */}
+              <Text
+                variant="subheadline"
+                color={palette.label}
+                style={styles.aiInsightText}
+              >
+                {currentAnalysis.strategicInsight}
+              </Text>
+
+              {/* Valoración probatoria / Conducencia */}
+              <View style={styles.aiDetailRow}>
+                <Symbol name="checkmark" size={13} color={palette.mode === 'dark' ? '#86EFAC' : '#15803D'} />
+                <Text variant="caption" weight="600" color={palette.secondaryLabel} style={{ flex: 1 }}>
+                  {currentAnalysis.probativeWeight}
+                </Text>
+              </View>
+
+              {/* Recomendación táctica */}
+              {currentAnalysis.recommendation ? (
+                <View style={styles.aiRecommendationRow}>
+                  <Symbol name="shield" size={13} color={palette.secondaryLabel} />
+                  <Text variant="caption" color={palette.secondaryLabel} style={{ flex: 1, lineHeight: 18 }}>
+                    <Text variant="caption" weight="700" color={palette.label}>
+                      {language === 'es' ? 'Táctica: ' : 'Tactical: '}
+                    </Text>
+                    {currentAnalysis.recommendation}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Alerta de auditoría relacionada si existe */}
+              {auditAlerts && auditAlerts.length > 0 && (
+                <View
+                  style={[
+                    styles.nodeAuditWarningBox,
+                    {
+                      backgroundColor:
+                        palette.mode === 'dark'
+                          ? 'rgba(239, 68, 68, 0.16)'
+                          : 'rgba(239, 68, 68, 0.08)',
+                      borderColor:
+                        palette.mode === 'dark'
+                          ? 'rgba(239, 68, 68, 0.35)'
+                          : 'rgba(239, 68, 68, 0.25)',
+                    },
+                  ]}
+                >
+                  <Symbol name="warning" size={13} color={palette.danger} />
+                  <Text variant="caption" color={palette.danger} style={{ flex: 1 }}>
+                    <Text variant="caption" weight="700" color={palette.danger}>
+                      {language === 'es' ? 'Alerta en Auditoría: ' : 'Audit Warning: '}
+                    </Text>
+                    {auditAlerts[0].title} — {auditAlerts[0].description}
+                  </Text>
+                </View>
+              )}
+
+              {/* Botón para profundizar análisis con Gemini */}
+              <Pressable
+                onPress={handleDeepen}
+                disabled={loadingDeep}
+                style={[
+                  styles.deepenButton,
+                  {
+                    backgroundColor:
+                      palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.10)'
+                        : 'rgba(255, 255, 255, 0.85)',
+                    borderColor:
+                      palette.mode === 'dark'
+                        ? 'rgba(160, 189, 84, 0.32)'
+                        : 'rgba(148, 181, 73, 0.38)',
+                  },
+                ]}
+              >
+                {loadingDeep ? (
+                  <ActivityIndicator size="small" color={palette.label} />
+                ) : (
+                  <Symbol
+                    name="sparkles"
+                    size={13}
+                    color={palette.mode === 'dark' ? '#C5DF7C' : '#5A7723'}
+                  />
+                )}
+                <Text variant="caption" weight="600" color={palette.label}>
+                  {loadingDeep
+                    ? (language === 'es' ? 'Consultando Gemini…' : 'Querying Gemini…')
+                    : deepAnalysis
+                      ? (language === 'es' ? 'Actualizar Análisis Gemini' : 'Refresh Gemini Analysis')
+                      : (language === 'es' ? 'Profundizar con IA (Gemini)' : 'Deepen with AI (Gemini)')}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* 3. Relaciones con otros elementos cuando está desplegado */}
+            {relations.length > 0 && (
+              <View style={styles.relationsWrapper}>
+                <Text variant="footnote" weight="600" color={palette.label} style={{ marginBottom: 6 }}>
+                  {relationsTitle}
+                </Text>
+                {relations.map((r) => {
+                  const isContradiction = r.type === 'CONTRADICTS';
+                  return (
+                    <View
+                      key={r.id}
+                      style={[
+                        styles.relationBadge,
+                        {
+                          backgroundColor: isContradiction
+                            ? palette.mode === 'dark' ? 'rgba(255,69,58,0.2)' : 'rgba(217,48,54,0.1)'
+                            : palette.groupedBackground,
+                          borderColor: isContradiction ? palette.danger : palette.separator,
+                        },
+                      ]}
+                    >
+                      <Symbol
+                        name={r.outgoing ? 'arrowRight' : 'arrowLeft'}
+                        size={13}
+                        color={isContradiction ? palette.danger : palette.label}
+                      />
+                      <Text
+                        variant="caption"
+                        weight="500"
+                        color={isContradiction ? palette.danger : palette.label}
+                        style={{ flex: 1 }}
+                      >
+                        {relationLabel(r.type)} • {r.other?.title ?? '—'}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
       </Pressable>
@@ -163,12 +370,12 @@ function AppleNodeCard({
 export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const palette = usePalette();
   const { t, language } = useSettings();
-  const { selectedCase, canvas, reloadCanvas, applyCanvas, narratives, addNarrativeEntry } =
+  const { selectedCase, canvas, reloadCanvas, applyCanvas, narratives, addNarrativeEntry, audit } =
     useCases();
   const recorder = useVoiceRecorder();
 
   const [filter, setFilter] = useState<NodeType | 'ALL'>('ALL');
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Record<string, boolean>>({});
   const [narrative, setNarrative] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(false);
@@ -187,18 +394,37 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
     [rawNodes, filter]
   );
 
-  const selectedNode: CanvasNode | undefined = rawNodes.find((n) => n.id === selectedNodeId);
-  const relations = useMemo(() => {
-    if (!graph || !selectedNode) return [];
-    const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
-    return rawEdges
-      .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
-      .map((e) => {
-        const outgoing = e.source === selectedNode.id;
-        const other = rawNodes.find((n) => n.id === (outgoing ? e.target : e.source));
-        return { id: e.id, outgoing, type: e.relationshipType, other };
-      });
-  }, [graph, selectedNode, rawNodes]);
+  const toggleNodeExpanded = (nodeId: string) => {
+    setExpandedNodeIds((prev) => ({
+      ...prev,
+      [nodeId]: !prev[nodeId],
+    }));
+  };
+
+  const getNodeRelations = useCallback(
+    (nodeId: string) => {
+      if (!graph) return [];
+      const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
+      return rawEdges
+        .filter((e) => e.source === nodeId || e.target === nodeId)
+        .map((e) => {
+          const outgoing = e.source === nodeId;
+          const other = rawNodes.find((n) => n.id === (outgoing ? e.target : e.source));
+          return { id: e.id, outgoing, type: e.relationshipType, other };
+        });
+    },
+    [graph, rawNodes]
+  );
+
+  const getNodeAuditAlerts = useCallback(
+    (nodeId: string) => {
+      const alerts = audit.data?.alerts || [];
+      return alerts.filter(
+        (a) => Array.isArray(a.relatedNodeIds) && a.relatedNodeIds.includes(nodeId)
+      );
+    },
+    [audit.data]
+  );
 
   const handleToggleVoice = async () => {
     setVoiceError(null);
@@ -257,28 +483,63 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
     setSending(true);
     setSendError(false);
     try {
-      let resultCanvas: any = null;
+      let resultSnapshot: CanvasSnapshot | null = null;
       let generatedNodes: any[] = [];
+
+      const extractSnapshot = (res: any): CanvasSnapshot | null => {
+        if (!res) return null;
+        if (res.snapshot && res.snapshot.canvas) {
+          return {
+            caseId: res.snapshot.caseId || selectedCase.id,
+            version: res.snapshot.version || res.version || 2,
+            updatedAt: res.snapshot.updatedAt || new Date().toISOString(),
+            canvas: {
+              nodes: Array.isArray(res.snapshot.canvas.nodes) ? res.snapshot.canvas.nodes : [],
+              edges: Array.isArray(res.snapshot.canvas.edges) ? res.snapshot.canvas.edges : [],
+            },
+          };
+        }
+        if (res.canvas && Array.isArray(res.canvas.nodes)) {
+          return {
+            caseId: res.caseId || selectedCase.id,
+            version: res.version || 2,
+            updatedAt: new Date().toISOString(),
+            canvas: res.canvas,
+          };
+        }
+        if (Array.isArray(res.extractedNodes) && res.extractedNodes.length > 0) {
+          return {
+            caseId: res.caseId || selectedCase.id,
+            version: res.version || 2,
+            updatedAt: new Date().toISOString(),
+            canvas: {
+              nodes: res.extractedNodes,
+              edges: Array.isArray(res.extractedEdges) ? res.extractedEdges : [],
+            },
+          };
+        }
+        return null;
+      };
 
       if (voiceAudio?.base64) {
         try {
-          const res = await caseService.postNarrativeVoice(
+          const res: any = await caseService.postNarrativeVoice(
             selectedCase.id,
             voiceAudio.base64,
             language
           );
-          resultCanvas = res.canvas;
-          generatedNodes = (res as any)?.extractedNodes || [];
+          resultSnapshot = extractSnapshot(res);
+          generatedNodes = res?.extractedNodes || res?.canvas?.nodes || [];
         } catch {
           if (currentText) {
             try {
-              const res = await caseService.postNarrativeText(
+              const res: any = await caseService.postNarrativeText(
                 selectedCase.id,
                 currentText,
                 language
               );
-              resultCanvas = res.canvas;
-              generatedNodes = (res as any)?.extractedNodes || [];
+              resultSnapshot = extractSnapshot(res);
+              generatedNodes = res?.extractedNodes || res?.canvas?.nodes || [];
             } catch {
               // Handled by Gemini fallback below
             }
@@ -286,16 +547,16 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
         }
       } else if (currentText) {
         try {
-          const res = await caseService.postNarrativeText(selectedCase.id, currentText, language);
-          resultCanvas = res.canvas;
-          generatedNodes = (res as any)?.extractedNodes || [];
+          const res: any = await caseService.postNarrativeText(selectedCase.id, currentText, language);
+          resultSnapshot = extractSnapshot(res);
+          generatedNodes = res?.extractedNodes || res?.canvas?.nodes || [];
         } catch {
           // Handled by Gemini fallback below
         }
       }
 
-      if (resultCanvas) {
-        applyCanvas(resultCanvas);
+      if (resultSnapshot) {
+        applyCanvas(resultSnapshot);
       } else {
         const fallbackCanvas = await geminiService.generateCanvasFromNarrative(
           selectedCase.id,
@@ -612,20 +873,23 @@ export default function CaseMapScreen({ onNavigate }: { onNavigate: (tab: Tab) =
                   ) : (
                     <View style={styles.nodesList}>
                       {nodes.map((node) => {
-                        const active = node.id === selectedNodeId;
+                        const active = Boolean(expandedNodeIds[node.id]);
                         return (
                           <AppleNodeCard
                             key={node.id}
                             node={node}
                             active={active}
-                            onPress={() => setSelectedNodeId(active ? null : node.id)}
-                            relations={active ? relations : []}
+                            onPress={() => toggleNodeExpanded(node.id)}
+                            relations={active ? getNodeRelations(node.id) : []}
                             nodeTypeLabel={t(labelKeys.nodeType(node.type))}
                             originLabel={
                               node.origin === 'AI_GENERATED' ? t('map.aiGenerated') : t('map.userCreated')
                             }
                             relationsTitle={t('map.relations')}
                             relationLabel={(type) => t(labelKeys.relation(type))}
+                            auditAlerts={getNodeAuditAlerts(node.id)}
+                            caseTitle={selectedCase?.title}
+                            language={language}
                           />
                         );
                       })}
@@ -838,6 +1102,82 @@ const styles = StyleSheet.create({
   nodeContent: {
     marginTop: 10,
     lineHeight: 19,
+  },
+  expandedContent: {
+    marginTop: 14,
+    gap: 12,
+  },
+  attachedInfoBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  attachedText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  aiAnalysisBox: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+  },
+  aiHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  aiHeaderTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  aiRelevancePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+  },
+  aiInsightText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  aiDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  aiRecommendationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 2,
+  },
+  nodeAuditWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    padding: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  deepenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 6,
   },
   relationsWrapper: {
     marginTop: 14,
